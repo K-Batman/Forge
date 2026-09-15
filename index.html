@@ -1002,25 +1002,28 @@ function ledgerYs(y, topY, bottomY, spacing) {
   return ys;
 }
 
-// Real clef glyphs (Material Design Icons, Apache-2.0) drawn as filled SVG
-// paths -- no font dependency, so they render identically everywhere and
-// actually look like clefs instead of a hand-drawn approximation.
-const TREBLE_CLEF_D = "M13 11V7.5L15.2 5.29C16 4.5 16.15 3.24 15.59 2.26C15.14 1.47 14.32 1 13.45 1C13.24 1 13 1.03 12.81 1.09C11.73 1.38 11 2.38 11 3.5V6.74L7.86 9.91C6.2 11.6 5.7 14.13 6.61 16.34C7.38 18.24 9.06 19.55 11 19.89V20.5C11 20.76 10.77 21 10.5 21H9V23H10.5C11.85 23 13 21.89 13 20.5V20C15.03 20 17.16 18.08 17.16 15.25C17.16 12.95 15.24 11 13 11M13 3.5C13 3.27 13.11 3.09 13.32 3.03C13.54 2.97 13.77 3.06 13.88 3.26C14 3.46 13.96 3.71 13.8 3.87L13 4.73V3.5M11 11.5C10.03 12.14 9.3 13.24 9.04 14.26L11 14.78V17.83C9.87 17.53 8.9 16.71 8.43 15.57C7.84 14.11 8.16 12.45 9.26 11.33L11 9.5V11.5M13 18V12.94C14.17 12.94 15.18 14.04 15.18 15.25C15.18 17 13.91 18 13 18Z";
-const BASS_CLEF_D = "M18.5 5A1.5 1.5 0 1 1 17 6.5A1.5 1.5 0 0 1 18.5 5M18.5 11A1.5 1.5 0 1 1 17 12.5A1.5 1.5 0 0 1 18.5 11M10 4A5 5 0 0 0 5 9V10A2 2 0 1 0 7.18 8A3 3 0 0 1 10 6A4 4 0 0 1 14 10C14 13.59 11.77 16.19 7 18.2L7.76 20.04C13.31 17.72 16 14.43 16 10A6 6 0 0 0 10 4Z";
+// Real clef outlines extracted straight from Bravura (the actual music
+// engraving font used by MuseScore/VexFlow etc, SIL Open Font License),
+// glyphs U+E050 (G clef) and U+E062 (F clef). Not a lookalike -- this is
+// the same shape as real sheet music.
+const TREBLE_CLEF_D = "M376-415C374-427 376-428 382-434C398-449 419-470 438-491C522-583 572-702 572-815C572-902 548-988 507-1048C492-1070 466-1098 455-1098C441-1098 410-1072 390-1050C316-968 292-843 292-739C292-681 299-616 306-575C308-563 309-561 297-551C233-498 164-437 112-373C43-287 0-194 0-87C0 87 119 252 364 252C387 252 413 250 433 246C444 244 446 243 448 255C460 322 475 409 475 456C475 604 375 622 316 622C262 622 236 606 236 593C236 586 245 583 268 576C299 567 335 540 335 482C335 427 300 380 239 380C172 380 132 433 132 495C132 560 171 658 322 658C389 658 519 628 519 458C519 401 501 306 490 244C488 232 489 233 503 227C604 187 671 102 671-11C671-139 577-252 430-252C404-252 404-252 401-270M470-943C503-943 530-916 530-861C530-792 497-728 419-650C403-634 379-611 356-591C349-585 345-586 343-599C339-625 337-659 337-691C337-847 409-943 470-943M361-262C364-243 364-244 346-238C258-208 201-129 201-44C201 46 248 110 316 133C324 136 336 139 343 139C351 139 355 134 355 128C355 121 347 118 340 115C298 97 268 54 268 8C268-49 307-92 368-109C384-113 386-112 388-101L438 197C440 208 439 208 424 211C408 214 388 216 368 216C193 216 80 119 80-20C80-79 90-158 173-252C233-319 279-356 326-394C336-402 338-401 340-390M430-103C428-115 429-118 441-117C522-110 589-42 589 46C589 109 551 160 495 188C483 194 481 194 479 182";
+const BASS_CLEF_D = "M252-262C78-262 0-135 0-39C0 41 42 110 123 110C186 110 229 66 229 4C229-60 182-100 133-100C106-100 96-93 83-93C70-93 67-101 67-111C67-151 127-224 229-224C335-224 381-120 381 37C381 140 359 260 297 356C237 449 134 534 10 605C1 610-5 615-5 623C-5 629-1 635 8 635C13 635 19 633 25 630C158 565 286 489 392 375C479 281 531 159 531 28C531-146 425-262 252-262M629-180C598-180 574-156 574-125C574-94 598-70 629-70C660-70 684-94 684-125C684-156 660-180 629-180M630 71C599 71 576 94 576 125C576 156 599 179 630 179C661 179 684 156 684 125C684 94 661 71 630 71";
 
-// Scale/offset calibrated by rendering against labeled staff lines and
-// checking the treble clef's eye lands on G4 (2nd line from bottom) and the
-// bass clef's dots straddle F3 (2nd line from top) -- not guessed by eye.
+// SMuFL glyph convention: a clef glyph's own origin (0,0) sits exactly on
+// the staff line it belongs to -- G4 for the G clef, F3 for the F clef.
+// So positioning is just "put the origin on that line's y", no guessing.
+const CLEF_FONT_UNITS_PER_STAFF_SPACE = 250; // Bravura unitsPerEm(1000) / 4
+
 function trebleClefPath(x, topY, spacing) {
-  const scale = 0.4 * spacing;
-  const y = topY - 1.8 * spacing;
-  return `<g transform="translate(${x}, ${y}) scale(${scale})"><path d="${TREBLE_CLEF_D}" fill="#222"/></g>`;
+  const scale = spacing / CLEF_FONT_UNITS_PER_STAFF_SPACE;
+  const g4Y = topY + 3 * spacing; // G4 = 2nd line from bottom
+  return `<g transform="translate(${x}, ${g4Y}) scale(${scale})"><path d="${TREBLE_CLEF_D}" fill="#222"/></g>`;
 }
 
 function bassClefPath(x, topY, spacing) {
-  const scale = (2 / 9) * spacing;
-  const y = topY - (7 / 9) * spacing;
-  return `<g transform="translate(${x}, ${y}) scale(${scale})"><path d="${BASS_CLEF_D}" fill="#222"/></g>`;
+  const scale = spacing / CLEF_FONT_UNITS_PER_STAFF_SPACE;
+  const f3Y = topY + spacing; // F3 = 2nd line from top
+  return `<g transform="translate(${x}, ${f3Y}) scale(${scale})"><path d="${BASS_CLEF_D}" fill="#222"/></g>`;
 }
 
 function drawStaff(note, clef) {
