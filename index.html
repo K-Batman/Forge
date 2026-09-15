@@ -197,6 +197,79 @@
     color: var(--muted);
     padding: 40px 20px;
   }
+
+  .stopwatch-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--card-border);
+    flex-wrap: wrap;
+  }
+  .stopwatch-time {
+    font-variant-numeric: tabular-nums;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stopwatch-time.running {
+    color: var(--accent);
+  }
+  .sw-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sw-btn.start {
+    background: var(--accent);
+    color: #0f1117;
+  }
+  .sw-btn.stop {
+    background: #3a1f1f;
+    color: #ff8a8a;
+    border: 1px solid #ff8a8a;
+  }
+  .sw-week-total {
+    margin-left: auto;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .sw-week-total b {
+    color: var(--text);
+  }
+  .weekly-reports {
+    margin-top: 24px;
+  }
+  .weekly-reports h3 {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .report-row {
+    display: flex;
+    justify-content: space-between;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+  }
+  .report-row.latest {
+    border-color: var(--good);
+  }
+  .report-row .label {
+    color: var(--muted);
+  }
+  .report-row .value {
+    font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -207,6 +280,8 @@
   </header>
 
   <div id="habitList"></div>
+
+  <div id="weeklyReports"></div>
 
   <div class="footer-actions">
     <button class="add-btn" id="addHabitBtn">+ Add a habit</button>
@@ -236,7 +311,11 @@ const STORAGE_KEY = "forge_habits_v1";
 
 const DEFAULT_HABITS = [
   { id: "bible", name: "Bible Reading", icon: "📖", log: {} },
-  { id: "piano", name: "Piano Practice", icon: "🎹", log: {} },
+  {
+    id: "piano", name: "Piano Practice", icon: "🎹", log: {},
+    trackTime: true,
+    practice: { seconds: {}, sessionStart: null, history: [] },
+  },
 ];
 
 function todayStr(offsetDays = 0) {
@@ -245,12 +324,29 @@ function todayStr(offsetDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
+function dateKey(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+// Migrate old saved habits so new fields exist without wiping progress.
+function migrateHabit(habit) {
+  if (habit.trackTime && !habit.practice) {
+    habit.practice = { seconds: {}, sessionStart: null, history: [] };
+  }
+  if (habit.practice) {
+    if (!habit.practice.seconds) habit.practice.seconds = {};
+    if (!habit.practice.history) habit.practice.history = [];
+    if (habit.practice.sessionStart === undefined) habit.practice.sessionStart = null;
+  }
+  return habit;
+}
+
 function loadHabits() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return structuredClone(DEFAULT_HABITS);
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length) return parsed;
+    if (Array.isArray(parsed) && parsed.length) return parsed.map(migrateHabit);
   } catch (e) {}
   return structuredClone(DEFAULT_HABITS);
 }
@@ -298,8 +394,143 @@ function calcBest(log) {
   return Math.max(best, calcStreak(log));
 }
 
-let habits = loadHabits();
+/* ---------- Stopwatch + weekly report helpers ---------- */
 
+function formatHMS(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  return [h, m, s].map(n => String(n).padStart(2, "0")).join(":");
+}
+
+function formatDuration(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.round((totalSeconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function startOfWeek(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function weekDates(monday) {
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    dates.push(dateKey(d));
+  }
+  return dates;
+}
+
+function sumSecondsForWeek(secondsLog, monday) {
+  return weekDates(monday).reduce((sum, key) => sum + (secondsLog[key] || 0), 0);
+}
+
+function currentSessionSeconds(habit) {
+  if (!habit.practice || !habit.practice.sessionStart) return 0;
+  return Math.floor((Date.now() - habit.practice.sessionStart) / 1000);
+}
+
+function liveTodaySeconds(habit) {
+  const today = todayStr();
+  const base = habit.practice.seconds[today] || 0;
+  return base + currentSessionSeconds(habit);
+}
+
+function liveWeekSeconds(habit) {
+  const monday = startOfWeek(new Date());
+  const base = sumSecondsForWeek(habit.practice.seconds, monday);
+  return base + currentSessionSeconds(habit);
+}
+
+function toggleStopwatch(id) {
+  const habit = habits.find(h => h.id === id);
+  if (!habit || !habit.trackTime) return;
+  if (habit.practice.sessionStart) {
+    // stop: commit elapsed seconds to today's log
+    const elapsed = currentSessionSeconds(habit);
+    const today = todayStr();
+    habit.practice.seconds[today] = (habit.practice.seconds[today] || 0) + elapsed;
+    habit.practice.sessionStart = null;
+  } else {
+    habit.practice.sessionStart = Date.now();
+  }
+  saveHabits(habits);
+  archiveCompletedWeeks();
+  render();
+}
+
+// A week's report unlocks once we're past Monday 6PM of the following week -
+// that gives a grace window for a Monday-evening practice session to still
+// count, then the previous Mon-Sun week gets locked in as a permanent report.
+function archiveCompletedWeeks() {
+  const now = new Date();
+  const thisMonday = startOfWeek(now);
+  const isMonday = now.getDay() === 1;
+  const pastCutoff = !isMonday || now.getHours() >= 18;
+  if (!pastCutoff) return;
+
+  let changed = false;
+  habits.forEach(habit => {
+    if (!habit.trackTime || !habit.practice) return;
+    const prevMonday = new Date(thisMonday);
+    prevMonday.setDate(prevMonday.getDate() - 7);
+    const weekKey = dateKey(prevMonday);
+    const already = habit.practice.history.some(h => h.weekStart === weekKey);
+    if (!already) {
+      const total = sumSecondsForWeek(habit.practice.seconds, prevMonday);
+      habit.practice.history.unshift({ weekStart: weekKey, seconds: total });
+      habit.practice.history = habit.practice.history.slice(0, 12);
+      changed = true;
+    }
+  });
+  if (changed) saveHabits(habits);
+}
+
+function renderStopwatchRow(habit) {
+  const running = !!habit.practice.sessionStart;
+  const todaySec = liveTodaySeconds(habit);
+  const weekSec = liveWeekSeconds(habit);
+  return `
+    <div class="stopwatch-row">
+      <span class="stopwatch-time ${running ? "running" : ""}" id="sw-time-${habit.id}">${formatHMS(todaySec)}</span>
+      <button class="sw-btn ${running ? "stop" : "start"}" data-sw-id="${habit.id}">${running ? "Stop" : "Start"}</button>
+      <span class="sw-week-total" id="sw-week-${habit.id}">This week: <b>${formatDuration(weekSec)}</b></span>
+    </div>
+  `;
+}
+
+function renderWeeklyReports() {
+  const box = document.getElementById("weeklyReports");
+  const trackedHabits = habits.filter(h => h.trackTime && h.practice && h.practice.history.length);
+  if (!trackedHabits.length) {
+    box.innerHTML = "";
+    return;
+  }
+  let html = "";
+  trackedHabits.forEach(habit => {
+    html += `<div class="weekly-reports"><h3>${escapeHtml(habit.name)} — Weekly Reports</h3>`;
+    habit.practice.history.forEach((entry, i) => {
+      const start = new Date(entry.weekStart + "T00:00:00");
+      const label = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      html += `<div class="report-row ${i === 0 ? "latest" : ""}">
+        <span class="label">Week of ${label}</span>
+        <span class="value">${formatDuration(entry.seconds)}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  box.innerHTML = html;
+}
+
+let habits = loadHabits();
 function render() {
   const list = document.getElementById("habitList");
   list.innerHTML = "";
@@ -328,6 +559,7 @@ function render() {
           <span>Best: <b>${best}</b></span>
           <span>Total: <b>${total}</b></span>
         </div>
+        ${habit.trackTime ? renderStopwatchRow(habit) : ""}
       </div>
       <button class="check-btn ${doneToday ? "checked" : ""}" data-id="${habit.id}">
         ${doneToday ? "✓" : ""}
@@ -339,6 +571,11 @@ function render() {
   list.querySelectorAll(".check-btn").forEach(btn => {
     btn.addEventListener("click", () => toggleToday(btn.dataset.id));
   });
+  list.querySelectorAll(".sw-btn").forEach(btn => {
+    btn.addEventListener("click", () => toggleStopwatch(btn.dataset.swId));
+  });
+
+  renderWeeklyReports();
 }
 
 function toggleToday(id) {
@@ -379,7 +616,25 @@ document.getElementById("saveDialog").addEventListener("click", () => {
   render();
 });
 
+archiveCompletedWeeks();
 render();
+
+setInterval(() => {
+  const anyRunning = habits.some(h => h.trackTime && h.practice && h.practice.sessionStart);
+  if (anyRunning) {
+    habits.forEach(habit => {
+      if (!habit.trackTime || !habit.practice || !habit.practice.sessionStart) return;
+      const timeEl = document.getElementById(`sw-time-${habit.id}`);
+      const weekEl = document.getElementById(`sw-week-${habit.id}`);
+      if (timeEl) timeEl.textContent = formatHMS(liveTodaySeconds(habit));
+      if (weekEl) weekEl.innerHTML = `This week: <b>${formatDuration(liveWeekSeconds(habit))}</b>`;
+    });
+  }
+  const before = habits.map(h => (h.practice ? h.practice.history.length : 0));
+  archiveCompletedWeeks();
+  const changed = habits.some((h, i) => (h.practice ? h.practice.history.length : 0) !== before[i]);
+  if (changed) render();
+}, 1000);
 </script>
 </body>
 </html>
