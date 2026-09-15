@@ -1132,7 +1132,7 @@ function nextCard() {
 function checkAnswer(btn) {
   if (srLocked || !currentNote || !btn) return;
   srLocked = true;
-  btn.focus();
+  btn.focus({ preventScroll: true });
   const guess = btn.dataset.letter;
   const correct = guess === currentNote.letter;
   const feedback = document.getElementById("srFeedback");
