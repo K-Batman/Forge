@@ -356,8 +356,8 @@
     max-width: 100vw;
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
-    padding: 0 16px;
-    min-height: calc(100vh - 90px);
+    padding: 0 20px;
+    min-height: calc(100vh - 40px);
     display: flex;
     flex-direction: column;
   }
@@ -365,9 +365,9 @@
     background: var(--card);
     border: 1px solid var(--card-border);
     border-radius: 16px;
-    padding: 24px;
+    padding: 28px;
     text-align: center;
-    max-width: 720px;
+    max-width: 1100px;
     width: 100%;
     margin: 0 auto;
     flex: 1;
@@ -377,54 +377,54 @@
   .sr-stats {
     display: flex;
     justify-content: center;
-    gap: 28px;
-    margin-bottom: 16px;
-    font-size: 1rem;
+    gap: 40px;
+    margin-bottom: 18px;
+    font-size: 1.15rem;
     color: var(--muted);
   }
   .sr-stats b {
     color: var(--text);
-    font-size: 1.1rem;
+    font-size: 1.3rem;
   }
   .clef-select {
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 20px;
   }
   .clef-select .tab-btn {
-    padding: 11px 24px;
-    font-size: 1rem;
+    padding: 13px 30px;
+    font-size: 1.15rem;
   }
   .staff-wrap {
     background: #eef0f5;
     border-radius: 12px;
-    padding: 16px 0;
-    margin-bottom: 24px;
+    padding: 20px 0;
+    margin-bottom: 26px;
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 260px;
+    min-height: 380px;
   }
   .staff-wrap svg {
     width: 100%;
     height: 100%;
-    max-height: 420px;
+    max-height: 640px;
   }
   .answer-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 16px;
+    margin-bottom: 14px;
   }
   .note-btn {
-    padding: 22px 0;
-    border-radius: 12px;
+    padding: 30px 0;
+    border-radius: 14px;
     border: 1px solid var(--card-border);
     background: #1f2330;
     color: var(--text);
-    font-size: 1.6rem;
+    font-size: 2rem;
     font-weight: 700;
     cursor: pointer;
   }
@@ -442,15 +442,16 @@
     border-color: #ff5c5c;
   }
   .sr-feedback {
-    min-height: 30px;
-    font-size: 1.1rem;
-    margin-bottom: 12px;
+    min-height: 34px;
+    font-size: 1.3rem;
+    margin-bottom: 14px;
     font-weight: 600;
   }
   .sr-feedback.good { color: var(--good); }
   .sr-feedback.bad { color: #ff8a8a; }
   @media (min-width: 700px) {
-    .note-btn { font-size: 1.9rem; padding: 26px 0; }
+    .note-btn { font-size: 2.4rem; padding: 36px 0; }
+    .sr-card { padding: 36px; }
   }
 </style>
 </head>
