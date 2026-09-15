@@ -431,6 +431,10 @@
   .note-btn:active {
     transform: scale(0.95);
   }
+  .note-btn:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+  }
   .note-btn.correct {
     background: var(--good);
     color: #0f1117;
@@ -1102,7 +1106,7 @@ function drawStaff(note, clef) {
 
 function renderAnswerGrid() {
   const grid = document.getElementById("srAnswers");
-  grid.innerHTML = NOTE_LETTERS.map(l => `<button class="note-btn" data-letter="${l}">${l}</button>`).join("");
+  grid.innerHTML = NOTE_LETTERS.map(l => `<button class="note-btn" data-letter="${l}" title="Press ${l} on your keyboard">${l}</button>`).join("");
   grid.querySelectorAll(".note-btn").forEach(btn => {
     btn.addEventListener("click", () => checkAnswer(btn));
   });
@@ -1126,8 +1130,9 @@ function nextCard() {
 }
 
 function checkAnswer(btn) {
-  if (srLocked || !currentNote) return;
+  if (srLocked || !currentNote || !btn) return;
   srLocked = true;
+  btn.focus();
   const guess = btn.dataset.letter;
   const correct = guess === currentNote.letter;
   const feedback = document.getElementById("srFeedback");
@@ -1161,6 +1166,21 @@ document.querySelectorAll(".clef-select .tab-btn").forEach(btn => {
     saveSR();
     nextCard();
   });
+});
+
+document.addEventListener("keydown", (e) => {
+  const activeTab = document.getElementById("tab-sightread");
+  if (!activeTab.classList.contains("active")) return;
+
+  const tag = document.activeElement?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
+
+  const letter = e.key.toUpperCase();
+  if (!NOTE_LETTERS.includes(letter)) return;
+
+  e.preventDefault();
+  const btn = document.querySelector(`.note-btn[data-letter="${letter}"]`);
+  checkAnswer(btn);
 });
 
 archiveCompletedWeeks();
