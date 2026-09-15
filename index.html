@@ -322,6 +322,100 @@
     border-color: var(--accent);
     color: var(--accent);
   }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--muted);
+    padding: 9px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0f1117;
+  }
+  .tab-panel {
+    display: none;
+  }
+  .tab-panel.active {
+    display: block;
+  }
+  .sr-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+  }
+  .sr-stats {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .sr-stats b {
+    color: var(--text);
+  }
+  .clef-select {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .staff-wrap {
+    background: #eef0f5;
+    border-radius: 12px;
+    padding: 10px 0;
+    margin-bottom: 18px;
+  }
+  .answer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .note-btn {
+    padding: 14px 0;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: #1f2330;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .note-btn:active {
+    transform: scale(0.95);
+  }
+  .note-btn.correct {
+    background: var(--good);
+    color: #0f1117;
+    border-color: var(--good);
+  }
+  .note-btn.wrong {
+    background: #ff5c5c;
+    color: #0f1117;
+    border-color: #ff5c5c;
+  }
+  .sr-feedback {
+    min-height: 24px;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .sr-feedback.good { color: var(--good); }
+  .sr-feedback.bad { color: #ff8a8a; }
 </style>
 </head>
 <body>
@@ -331,14 +425,40 @@
     <p id="tagline">Build the habit. Every day.</p>
   </header>
 
-  <div id="habitList"></div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="habits">Habits</button>
+    <button class="tab-btn" data-tab="sightread">🎼 Sight Reading</button>
+  </div>
 
-  <div id="weeklyReports"></div>
+  <div id="tab-habits" class="tab-panel active">
+    <div id="habitList"></div>
 
-  <div id="taskSection"></div>
+    <div id="weeklyReports"></div>
 
-  <div class="footer-actions">
-    <button class="add-btn" id="addHabitBtn">+ Add a habit</button>
+    <div id="taskSection"></div>
+
+    <div class="footer-actions">
+      <button class="add-btn" id="addHabitBtn">+ Add a habit</button>
+    </div>
+  </div>
+
+  <div id="tab-sightread" class="tab-panel">
+    <div class="sr-card">
+      <div class="sr-stats">
+        <span>Streak: <b id="srStreak">0</b></span>
+        <span>Best: <b id="srBest">0</b></span>
+        <span>Accuracy: <b id="srAccuracy">0%</b></span>
+      </div>
+      <div class="clef-select">
+        <button class="tab-btn active" data-clef="treble">Treble 🎵</button>
+        <button class="tab-btn" data-clef="bass">Bass 🎵</button>
+      </div>
+      <div class="staff-wrap">
+        <svg id="staffSvg" viewBox="0 0 200 100" width="100%" height="140"></svg>
+      </div>
+      <div class="sr-feedback" id="srFeedback">What note is this?</div>
+      <div class="answer-grid" id="srAnswers"></div>
+    </div>
   </div>
 </div>
 
@@ -815,6 +935,168 @@ document.getElementById("saveTaskDialog").addEventListener("click", () => {
   saveTasks(tasks);
   taskDialog.close();
   renderTasks();
+});
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".tabs .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs .tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "sightread") nextCard();
+  });
+});
+
+/* ---------- Sight Reading flashcards ---------- */
+
+const SR_KEY = "forge_sightread_v1";
+const LETTER_ORDER = ["C", "D", "E", "F", "G", "A", "B"];
+const NOTE_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+
+const CLEF_RANGES = {
+  treble: { low: { letter: "C", octave: 4 }, high: { letter: "C", octave: 6 }, refLetter: "E", refOctave: 4, symbol: "\uD834\uDD1E" },
+  bass: { low: { letter: "E", octave: 2 }, high: { letter: "C", octave: 4 }, refLetter: "G", refOctave: 2, symbol: "\uD834\uDD22" },
+};
+
+function absStep(letter, octave) {
+  return octave * 7 + LETTER_ORDER.indexOf(letter);
+}
+
+function loadSR() {
+  const raw = localStorage.getItem(SR_KEY);
+  if (!raw) return { streak: 0, best: 0, correct: 0, total: 0, clef: "treble" };
+  try {
+    const parsed = JSON.parse(raw);
+    return Object.assign({ streak: 0, best: 0, correct: 0, total: 0, clef: "treble" }, parsed);
+  } catch (e) {
+    return { streak: 0, best: 0, correct: 0, total: 0, clef: "treble" };
+  }
+}
+
+function saveSR() {
+  localStorage.setItem(SR_KEY, JSON.stringify(srState));
+}
+
+let srState = loadSR();
+let currentNote = null;
+let srLocked = false;
+
+function randomNoteInRange(clef) {
+  const range = CLEF_RANGES[clef];
+  const lowStep = absStep(range.low.letter, range.low.octave);
+  const highStep = absStep(range.high.letter, range.high.octave);
+  const step = lowStep + Math.floor(Math.random() * (highStep - lowStep + 1));
+  const octave = Math.floor(step / 7);
+  const letter = LETTER_ORDER[step % 7];
+  return { letter, octave, step };
+}
+
+function ledgerYs(y, topY, bottomY, spacing) {
+  const ys = [];
+  if (y < topY - 0.01) {
+    for (let ly = topY - spacing; ly >= y - 0.01; ly -= spacing) ys.push(ly);
+  } else if (y > bottomY + 0.01) {
+    for (let ly = bottomY + spacing; ly <= y + 0.01; ly += spacing) ys.push(ly);
+  }
+  return ys;
+}
+
+function drawStaff(note, clef) {
+  const svg = document.getElementById("staffSvg");
+  const spacing = 8;
+  const topY = 30;
+  const bottomY = topY + spacing * 4;
+  const noteX = 130;
+
+  const range = CLEF_RANGES[clef];
+  const refStep = absStep(range.refLetter, range.refOctave);
+  const deltaSteps = note.step - refStep;
+  const noteY = bottomY - deltaSteps * (spacing / 2);
+
+  let svgContent = "";
+  // 5 staff lines
+  for (let i = 0; i < 5; i++) {
+    const y = topY + i * spacing;
+    svgContent += `<line x1="10" y1="${y}" x2="190" y2="${y}" stroke="#333" stroke-width="1"/>`;
+  }
+  // clef symbol
+  const clefSize = clef === "treble" ? 34 : 20;
+  const clefY = clef === "treble" ? bottomY + 4 : topY + spacing * 1.5 + 5;
+  svgContent += `<text x="14" y="${clefY}" font-size="${clefSize}" fill="#222">${range.symbol}</text>`;
+
+  // ledger lines
+  ledgerYs(noteY, topY, bottomY, spacing).forEach(ly => {
+    svgContent += `<line x1="${noteX - 10}" y1="${ly}" x2="${noteX + 10}" y2="${ly}" stroke="#333" stroke-width="1"/>`;
+  });
+
+  // note head
+  svgContent += `<ellipse cx="${noteX}" cy="${noteY}" rx="7" ry="5.5" fill="#222"/>`;
+
+  svg.innerHTML = svgContent;
+}
+
+function renderAnswerGrid() {
+  const grid = document.getElementById("srAnswers");
+  grid.innerHTML = NOTE_LETTERS.map(l => `<button class="note-btn" data-letter="${l}">${l}</button>`).join("");
+  grid.querySelectorAll(".note-btn").forEach(btn => {
+    btn.addEventListener("click", () => checkAnswer(btn));
+  });
+}
+
+function updateSRStats() {
+  document.getElementById("srStreak").textContent = srState.streak;
+  document.getElementById("srBest").textContent = srState.best;
+  const pct = srState.total ? Math.round((srState.correct / srState.total) * 100) : 0;
+  document.getElementById("srAccuracy").textContent = pct + "%";
+}
+
+function nextCard() {
+  srLocked = false;
+  currentNote = randomNoteInRange(srState.clef);
+  drawStaff(currentNote, srState.clef);
+  document.getElementById("srFeedback").textContent = "What note is this?";
+  document.getElementById("srFeedback").className = "sr-feedback";
+  renderAnswerGrid();
+  updateSRStats();
+}
+
+function checkAnswer(btn) {
+  if (srLocked || !currentNote) return;
+  srLocked = true;
+  const guess = btn.dataset.letter;
+  const correct = guess === currentNote.letter;
+  const feedback = document.getElementById("srFeedback");
+
+  srState.total++;
+  if (correct) {
+    srState.correct++;
+    srState.streak++;
+    srState.best = Math.max(srState.best, srState.streak);
+    btn.classList.add("correct");
+    feedback.textContent = `Correct! ${currentNote.letter}${currentNote.octave} 🔥`;
+    feedback.className = "sr-feedback good";
+  } else {
+    srState.streak = 0;
+    btn.classList.add("wrong");
+    const rightBtn = document.querySelector(`.note-btn[data-letter="${currentNote.letter}"]`);
+    if (rightBtn) rightBtn.classList.add("correct");
+    feedback.textContent = `That was ${currentNote.letter}${currentNote.octave}`;
+    feedback.className = "sr-feedback bad";
+  }
+  saveSR();
+  updateSRStats();
+  setTimeout(nextCard, correct ? 700 : 1400);
+}
+
+document.querySelectorAll(".clef-select .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".clef-select .tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    srState.clef = btn.dataset.clef;
+    saveSR();
+    nextCard();
+  });
 });
 
 archiveCompletedWeeks();
