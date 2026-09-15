@@ -270,6 +270,58 @@
   .report-row .value {
     font-weight: 600;
   }
+  .section-title {
+    margin: 28px 0 12px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .task-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .task-card.done {
+    opacity: 0.7;
+    border-color: var(--good);
+  }
+  .task-card.late {
+    border-color: #ff5c5c;
+  }
+  .task-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .task-name {
+    font-weight: 600;
+  }
+  .task-meta {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 2px;
+  }
+  .task-meta.late-text {
+    color: #ff8a8a;
+  }
+  .mini-btn {
+    background: transparent;
+    border: 1px dashed var(--card-border);
+    color: var(--muted);
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+  .mini-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -282,6 +334,8 @@
   <div id="habitList"></div>
 
   <div id="weeklyReports"></div>
+
+  <div id="taskSection"></div>
 
   <div class="footer-actions">
     <button class="add-btn" id="addHabitBtn">+ Add a habit</button>
@@ -300,6 +354,26 @@
   </div>
 </dialog>
 
+<dialog id="taskDialog">
+  <h3 style="margin-top:0">New chore / reminder</h3>
+  <label for="tName">Task</label>
+  <input id="tName" placeholder="e.g. Take trash out" maxlength="40">
+  <label for="tIcon">Icon (emoji)</label>
+  <input id="tIcon" placeholder="✅" maxlength="4">
+  <label for="tRepeat">Repeat</label>
+  <select id="tRepeat">
+    <option value="daily">Daily</option>
+    <option value="weekly">Weekly</option>
+    <option value="once">Once</option>
+  </select>
+  <label for="tDue">Due time (optional)</label>
+  <input id="tDue" type="time">
+  <div class="dialog-actions">
+    <button class="btn-cancel" id="cancelTaskDialog">Cancel</button>
+    <button class="btn-save" id="saveTaskDialog">Add</button>
+  </div>
+</dialog>
+
 <script>
 /* ---------- Data model ----------
   Each habit: { id, name, icon, log: { "YYYY-MM-DD": true, ... } }
@@ -308,6 +382,7 @@
 ------------------------------------- */
 
 const STORAGE_KEY = "forge_habits_v1";
+const TASKS_KEY = "forge_tasks_v1";
 
 const DEFAULT_HABITS = [
   { id: "bible", name: "Bible Reading", icon: "📖", log: {} },
@@ -316,6 +391,15 @@ const DEFAULT_HABITS = [
     trackTime: true,
     practice: { seconds: {}, sessionStart: null, history: [] },
   },
+  { id: "math", name: "Math", icon: "➗", log: {} },
+  { id: "reading", name: "Reading", icon: "📚", log: {} },
+  { id: "science", name: "Science", icon: "🔬", log: {} },
+];
+
+const DEFAULT_TASKS = [
+  { id: "make-bed", name: "Make bed", icon: "🛏️", repeat: "daily", dueTime: "09:00", done: {} },
+  { id: "tidy-room", name: "Tidy room", icon: "🧹", repeat: "daily", dueTime: "", done: {} },
+  { id: "trash", name: "Take trash out", icon: "🗑️", repeat: "weekly", dueTime: "18:00", done: {} },
 ];
 
 function todayStr(offsetDays = 0) {
@@ -346,13 +430,33 @@ function loadHabits() {
   if (!raw) return structuredClone(DEFAULT_HABITS);
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length) return parsed.map(migrateHabit);
+    if (Array.isArray(parsed) && parsed.length) {
+      const migrated = parsed.map(migrateHabit);
+      DEFAULT_HABITS.forEach(defaultHabit => {
+        if (!migrated.some(h => h.id === defaultHabit.id)) migrated.push(structuredClone(defaultHabit));
+      });
+      return migrated;
+    }
   } catch (e) {}
   return structuredClone(DEFAULT_HABITS);
 }
 
 function saveHabits(habits) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+}
+
+function loadTasks() {
+  const raw = localStorage.getItem(TASKS_KEY);
+  if (!raw) return structuredClone(DEFAULT_TASKS);
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {}
+  return structuredClone(DEFAULT_TASKS);
+}
+
+function saveTasks(tasks) {
+  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
 }
 
 function calcStreak(log) {
@@ -531,6 +635,79 @@ function renderWeeklyReports() {
 }
 
 let habits = loadHabits();
+let tasks = loadTasks();
+
+function periodKeyForTask(task) {
+  if (task.repeat === "weekly") return dateKey(startOfWeek(new Date()));
+  if (task.repeat === "once") return "once";
+  return todayStr();
+}
+
+function taskIsLate(task) {
+  if (!task.dueTime || task.done[periodKeyForTask(task)]) return false;
+  const now = new Date();
+  if (task.repeat === "weekly") {
+    const weekEnd = startOfWeek(now);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const [h, m] = task.dueTime.split(":").map(Number);
+    weekEnd.setHours(h, m, 0, 0);
+    return now > weekEnd;
+  }
+  const [h, m] = task.dueTime.split(":").map(Number);
+  const due = new Date();
+  due.setHours(h, m, 0, 0);
+  return now > due;
+}
+
+function repeatLabel(task) {
+  if (task.repeat === "daily") return task.dueTime ? `Daily by ${task.dueTime}` : "Daily";
+  if (task.repeat === "weekly") return task.dueTime ? `Weekly by Sunday ${task.dueTime}` : "Weekly";
+  return task.dueTime ? `One time by ${task.dueTime}` : "One time";
+}
+
+function renderTasks() {
+  const box = document.getElementById("taskSection");
+  let html = `<h3 class="section-title">Chores + reminders</h3>`;
+
+  if (!tasks.length) {
+    html += `<div class="empty-state">No tasks yet. Add a chore or reminder below.</div>`;
+  } else {
+    tasks.forEach(task => {
+      const key = periodKeyForTask(task);
+      const done = !!task.done[key];
+      const late = taskIsLate(task);
+      html += `
+        <div class="task-card ${done ? "done" : ""} ${late ? "late" : ""}">
+          <div class="habit-icon">${task.icon}</div>
+          <div class="task-main">
+            <div class="task-name">${escapeHtml(task.name)}</div>
+            <div class="task-meta ${late ? "late-text" : ""}">${late ? "Late — " : ""}${repeatLabel(task)}</div>
+          </div>
+          <button class="check-btn ${done ? "checked" : ""}" data-task-id="${task.id}">${done ? "✓" : ""}</button>
+        </div>
+      `;
+    });
+  }
+
+  html += `<button class="mini-btn" id="addTaskBtn">+ Add chore/reminder</button>`;
+  box.innerHTML = html;
+
+  box.querySelectorAll("[data-task-id]").forEach(btn => {
+    btn.addEventListener("click", () => toggleTask(btn.dataset.taskId));
+  });
+  document.getElementById("addTaskBtn").addEventListener("click", openTaskDialog);
+}
+
+function toggleTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const key = periodKeyForTask(task);
+  if (task.done[key]) delete task.done[key];
+  else task.done[key] = true;
+  saveTasks(tasks);
+  renderTasks();
+}
+
 function render() {
   const list = document.getElementById("habitList");
   list.innerHTML = "";
@@ -576,6 +753,7 @@ function render() {
   });
 
   renderWeeklyReports();
+  renderTasks();
 }
 
 function toggleToday(id) {
@@ -614,6 +792,29 @@ document.getElementById("saveDialog").addEventListener("click", () => {
   saveHabits(habits);
   dialog.close();
   render();
+});
+
+// Add chore / reminder dialog
+const taskDialog = document.getElementById("taskDialog");
+function openTaskDialog() {
+  document.getElementById("tName").value = "";
+  document.getElementById("tIcon").value = "";
+  document.getElementById("tRepeat").value = "daily";
+  document.getElementById("tDue").value = "";
+  taskDialog.showModal();
+}
+document.getElementById("cancelTaskDialog").addEventListener("click", () => taskDialog.close());
+document.getElementById("saveTaskDialog").addEventListener("click", () => {
+  const name = document.getElementById("tName").value.trim();
+  const icon = document.getElementById("tIcon").value.trim() || "✅";
+  const repeat = document.getElementById("tRepeat").value;
+  const dueTime = document.getElementById("tDue").value;
+  if (!name) return;
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now().toString(36);
+  tasks.push({ id, name, icon, repeat, dueTime, done: {} });
+  saveTasks(tasks);
+  taskDialog.close();
+  renderTasks();
 });
 
 archiveCompletedWeeks();
