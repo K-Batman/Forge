@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0f1117;
@@ -454,7 +457,7 @@
         <button class="tab-btn" data-clef="bass">Bass 🎵</button>
       </div>
       <div class="staff-wrap">
-        <svg id="staffSvg" viewBox="0 0 200 100" width="100%" height="140"></svg>
+        <svg id="staffSvg" viewBox="0 0 200 150" width="100%" height="180"></svg>
       </div>
       <div class="sr-feedback" id="srFeedback">What note is this?</div>
       <div class="answer-grid" id="srAnswers"></div>
@@ -1002,12 +1005,49 @@ function ledgerYs(y, topY, bottomY, spacing) {
   return ys;
 }
 
+function trebleClefPath(x, bottomLineY, spacing) {
+  // Hand-built vector G-clef, sized relative to the staff so it never
+  // depends on a font having the Unicode musical-symbol glyph.
+  const s = spacing / 9; // scale factor (spacing=9 is the "native" size this was designed at)
+  const b = bottomLineY;
+  return `
+    <g transform="translate(${x},0) scale(${s})">
+      <path d="M 16,${b - 70}
+        C 4,${b - 66} 2,${b - 54} 8,${b - 46}
+        C 14,${b - 38} 26,${b - 35} 30,${b - 25}
+        C 33,${b - 18} 28,${b - 11} 18,${b - 9}
+        C 6,${b - 7} 0,${b + 1} 6,${b + 9}
+        C 12,${b + 16} 26,${b + 16} 30,${b + 7}
+        C 33,${b + 1} 27,${b - 3} 22,${b - 2}"
+        fill="none" stroke="#222" stroke-width="5" stroke-linecap="round"/>
+      <line x1="18" y1="${b - 78}" x2="18" y2="${b + 9}" stroke="#222" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="14" cy="${b + 9}" r="5" fill="#222"/>
+    </g>
+  `;
+}
+
+function bassClefPath(x, topLineFY, spacing) {
+  // Hand-built vector F-clef: a hook plus the two dots that straddle the F line.
+  const s = spacing / 9;
+  const f = topLineFY;
+  return `
+    <g transform="translate(${x},0) scale(${s})">
+      <path d="M 4,${f - 8}
+        C 4,${f - 26} 30,${f - 26} 30,${f - 4}
+        C 30,${f + 16} 12,${f + 26} 0,${f + 30}"
+        fill="none" stroke="#222" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="32" cy="${f - 6}" r="3.5" fill="#222"/>
+      <circle cx="32" cy="${f + 6}" r="3.5" fill="#222"/>
+    </g>
+  `;
+}
+
 function drawStaff(note, clef) {
   const svg = document.getElementById("staffSvg");
-  const spacing = 8;
-  const topY = 30;
+  const spacing = 9;
+  const topY = 50;
   const bottomY = topY + spacing * 4;
-  const noteX = 130;
+  const noteX = 150;
 
   const range = CLEF_RANGES[clef];
   const refStep = absStep(range.refLetter, range.refOctave);
@@ -1018,12 +1058,16 @@ function drawStaff(note, clef) {
   // 5 staff lines
   for (let i = 0; i < 5; i++) {
     const y = topY + i * spacing;
-    svgContent += `<line x1="10" y1="${y}" x2="190" y2="${y}" stroke="#333" stroke-width="1"/>`;
+    svgContent += `<line x1="10" y1="${y}" x2="195" y2="${y}" stroke="#333" stroke-width="1"/>`;
   }
-  // clef symbol
-  const clefSize = clef === "treble" ? 34 : 20;
-  const clefY = clef === "treble" ? bottomY + 4 : topY + spacing * 1.5 + 5;
-  svgContent += `<text x="14" y="${clefY}" font-size="${clefSize}" fill="#222">${range.symbol}</text>`;
+
+  // clef symbol, drawn as vector paths (no font/glyph dependency)
+  if (clef === "treble") {
+    svgContent += trebleClefPath(14, bottomY, spacing);
+  } else {
+    const fLineY = topY + spacing; // 2nd line from top = F3 on bass staff
+    svgContent += bassClefPath(14, fLineY, spacing);
+  }
 
   // ledger lines
   ledgerYs(noteY, topY, bottomY, spacing).forEach(ly => {
