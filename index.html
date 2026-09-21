@@ -486,6 +486,7 @@
   <div id="tab-sightread" class="tab-panel">
     <div class="sr-card">
       <div class="sr-stats">
+        <span>Time: <b id="srTimer">0:00</b></span>
         <span>Streak: <b id="srStreak">0</b></span>
         <span>Best: <b id="srBest">0</b></span>
         <span>Accuracy: <b id="srAccuracy">0%</b></span>
@@ -985,7 +986,11 @@ document.querySelectorAll(".tabs .tab-btn").forEach(btn => {
     btn.classList.add("active");
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    if (btn.dataset.tab === "sightread") nextCard();
+    if (btn.dataset.tab === "sightread") {
+      srSessionStart = Date.now();
+      updateSRTimer();
+      nextCard();
+    }
   });
 });
 
@@ -994,6 +999,70 @@ document.querySelectorAll(".tabs .tab-btn").forEach(btn => {
 const SR_KEY = "forge_sightread_v1";
 const LETTER_ORDER = ["C", "D", "E", "F", "G", "A", "B"];
 const NOTE_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+
+let srSessionStart = null;
+
+function updateSRTimer() {
+  const el = document.getElementById("srTimer");
+  if (!el) return;
+  const secs = srSessionStart ? Math.floor((Date.now() - srSessionStart) / 1000) : 0;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/* ---------- Sound effects (Web Audio, no external files) ---------- */
+
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+// Natural-note semitone offsets from C, used to compute real pitch (MIDI/Hz)
+// for the exact note shown on the flashcard.
+const NOTE_SEMITONES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+function noteToFrequency(letter, octave) {
+  const midi = (octave + 1) * 12 + NOTE_SEMITONES[letter];
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function playNoteSound(freq) {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.28, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.6);
+}
+
+function playBonkSound() {
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(180, now);
+  osc.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.25);
+}
 
 const CLEF_RANGES = {
   treble: { low: { letter: "C", octave: 4 }, high: { letter: "C", octave: 6 }, refLetter: "E", refOctave: 4, symbol: "\uD834\uDD1E" },
@@ -1139,6 +1208,7 @@ function checkAnswer(btn) {
 
   srState.total++;
   if (correct) {
+    playNoteSound(noteToFrequency(currentNote.letter, currentNote.octave));
     srState.correct++;
     srState.streak++;
     srState.best = Math.max(srState.best, srState.streak);
@@ -1146,6 +1216,7 @@ function checkAnswer(btn) {
     feedback.textContent = `Correct! ${currentNote.letter}${currentNote.octave} 🔥`;
     feedback.className = "sr-feedback good";
   } else {
+    playBonkSound();
     srState.streak = 0;
     btn.classList.add("wrong");
     const rightBtn = document.querySelector(`.note-btn[data-letter="${currentNote.letter}"]`);
@@ -1187,6 +1258,7 @@ archiveCompletedWeeks();
 render();
 
 setInterval(() => {
+  if (document.getElementById("tab-sightread").classList.contains("active")) updateSRTimer();
   const anyRunning = habits.some(h => h.trackTime && h.practice && h.practice.sessionStart);
   if (anyRunning) {
     habits.forEach(habit => {
