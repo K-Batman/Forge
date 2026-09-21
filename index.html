@@ -487,10 +487,10 @@
     <div class="sr-card">
       <div class="sr-stats">
         <span>Time: <b id="srTimer">0:00</b></span>
-        <span id="srProgressWrap" hidden>Run: <b id="srProgress">0/14</b></span>
+        <span id="srProgressWrap">Run: <b id="srProgress">0/0</b></span>
         <span>Streak: <b id="srStreak">0</b></span>
         <span id="srBestWrap">Best: <b id="srBest">0</b></span>
-        <span id="srRecordWrap" hidden>Record: <b id="srRecord">--</b></span>
+        <span id="srRecordWrap">Record: <b id="srRecord">--</b></span>
         <span>Accuracy: <b id="srAccuracy">0%</b></span>
       </div>
       <div class="clef-select">
@@ -991,7 +991,7 @@ document.querySelectorAll(".tabs .tab-btn").forEach(btn => {
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "sightread") {
       srSessionStart = Date.now();
-      resetMixedRun();
+      startRun();
       syncClefButtons();
       updateSRTimer();
       nextCard();
@@ -1007,11 +1007,12 @@ const NOTE_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
 
 let srSessionStart = null;
 
-// Mixed mode is a timed run: get every note in the run right, no mistakes.
-// One wrong answer restarts the run. Finishing records your best time.
-const MIXED_RUN_LENGTH = 14;
-let mixedRunIndex = 0;
-let mixedRunStart = null;
+// Every mode is a timed perfect run over EVERY note in that mode's range,
+// each note exactly once, shuffled. One mistake reshuffles and restarts.
+// Finishing records your best time for that mode.
+let runDeck = [];
+let runIndex = 0;
+let runStart = null;
 
 function formatClock(secs) {
   const m = Math.floor(secs / 60);
@@ -1022,18 +1023,37 @@ function formatClock(secs) {
 function updateSRTimer() {
   const el = document.getElementById("srTimer");
   if (!el) return;
-  if (srState.clef === "mixed") {
-    const secs = mixedRunStart ? (Date.now() - mixedRunStart) / 1000 : 0;
-    el.textContent = formatClock(secs);
-  } else {
-    const secs = srSessionStart ? (Date.now() - srSessionStart) / 1000 : 0;
-    el.textContent = formatClock(secs);
-  }
+  const secs = runStart ? (Date.now() - runStart) / 1000 : 0;
+  el.textContent = formatClock(secs);
 }
 
-function resetMixedRun() {
-  mixedRunIndex = 0;
-  mixedRunStart = null;
+// Every natural note between the low and high bound of a clef's range.
+function allNotesForClef(clef) {
+  const range = CLEF_RANGES[clef];
+  const lowStep = absStep(range.low.letter, range.low.octave);
+  const highStep = absStep(range.high.letter, range.high.octave);
+  const notes = [];
+  for (let step = lowStep; step <= highStep; step++) {
+    notes.push({ letter: LETTER_ORDER[step % 7], octave: Math.floor(step / 7), step, clef });
+  }
+  return notes;
+}
+
+function buildRunDeck(mode) {
+  const notes = mode === "mixed"
+    ? allNotesForClef("treble").concat(allNotesForClef("bass"))
+    : allNotesForClef(mode);
+  for (let i = notes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = notes[i]; notes[i] = notes[j]; notes[j] = tmp;
+  }
+  return notes;
+}
+
+function startRun() {
+  runDeck = buildRunDeck(srState.clef);
+  runIndex = 0;
+  runStart = null;
 }
 
 /* ---------- Sound effects (Web Audio, no external files) ---------- */
@@ -1098,16 +1118,27 @@ function absStep(letter, octave) {
   return octave * 7 + LETTER_ORDER.indexOf(letter);
 }
 
-const SR_DEFAULTS = { streak: 0, best: 0, correct: 0, total: 0, clef: "treble", bestMixedMs: null };
+const SR_DEFAULTS = {
+  streak: 0, best: 0, correct: 0, total: 0, clef: "treble",
+  bestMs: { treble: null, bass: null, mixed: null },
+};
+
+function normalizeSR(state) {
+  const s = Object.assign({}, SR_DEFAULTS, state);
+  s.bestMs = Object.assign({ treble: null, bass: null, mixed: null }, s.bestMs || {});
+  // migrate the old mixed-only record field
+  if (state && state.bestMixedMs && !s.bestMs.mixed) s.bestMs.mixed = state.bestMixedMs;
+  delete s.bestMixedMs;
+  return s;
+}
 
 function loadSR() {
   const raw = localStorage.getItem(SR_KEY);
-  if (!raw) return Object.assign({}, SR_DEFAULTS);
+  if (!raw) return normalizeSR(null);
   try {
-    const parsed = JSON.parse(raw);
-    return Object.assign({}, SR_DEFAULTS, parsed);
+    return normalizeSR(JSON.parse(raw));
   } catch (e) {
-    return Object.assign({}, SR_DEFAULTS);
+    return normalizeSR(null);
   }
 }
 
@@ -1120,20 +1151,7 @@ let currentNote = null;
 let currentClef = null;
 let srLocked = false;
 
-function resolveClef() {
-  if (srState.clef !== "mixed") return srState.clef;
-  return Math.random() < 0.5 ? "treble" : "bass";
-}
 
-function randomNoteInRange(clef) {
-  const range = CLEF_RANGES[clef];
-  const lowStep = absStep(range.low.letter, range.low.octave);
-  const highStep = absStep(range.high.letter, range.high.octave);
-  const step = lowStep + Math.floor(Math.random() * (highStep - lowStep + 1));
-  const octave = Math.floor(step / 7);
-  const letter = LETTER_ORDER[step % 7];
-  return { letter, octave, step };
-}
 
 function ledgerYs(y, topY, bottomY, spacing) {
   const ys = [];
@@ -1215,30 +1233,25 @@ function renderAnswerGrid() {
 }
 
 function updateSRStats() {
-  const mixed = srState.clef === "mixed";
   document.getElementById("srStreak").textContent = srState.streak;
   document.getElementById("srBest").textContent = srState.best;
   const pct = srState.total ? Math.round((srState.correct / srState.total) * 100) : 0;
   document.getElementById("srAccuracy").textContent = pct + "%";
 
-  document.getElementById("srProgressWrap").hidden = !mixed;
-  document.getElementById("srRecordWrap").hidden = !mixed;
-  document.getElementById("srBestWrap").hidden = mixed;
-  if (mixed) {
-    document.getElementById("srProgress").textContent = `${mixedRunIndex}/${MIXED_RUN_LENGTH}`;
-    document.getElementById("srRecord").textContent =
-      srState.bestMixedMs ? formatClock(srState.bestMixedMs / 1000) : "--";
-  }
+  document.getElementById("srProgress").textContent = `${runIndex}/${runDeck.length}`;
+  const record = srState.bestMs[srState.clef];
+  document.getElementById("srRecord").textContent = record ? formatClock(record / 1000) : "--";
 }
 
 function nextCard() {
   srLocked = false;
-  currentClef = resolveClef();
-  currentNote = randomNoteInRange(currentClef);
+  if (!runDeck.length || runIndex >= runDeck.length) startRun();
+  currentNote = runDeck[runIndex];
+  currentClef = currentNote.clef;
   drawStaff(currentNote, currentClef);
   const fb = document.getElementById("srFeedback");
-  fb.textContent = srState.clef === "mixed" && mixedRunStart === null
-    ? `Perfect run: ${MIXED_RUN_LENGTH} notes, no mistakes. Go!`
+  fb.textContent = runStart === null
+    ? `Perfect run: all ${runDeck.length} notes, no mistakes. Go!`
     : "What note is this?";
   fb.className = "sr-feedback";
   renderAnswerGrid();
@@ -1253,7 +1266,6 @@ function checkAnswer(btn) {
   const correct = guess === currentNote.letter;
   const feedback = document.getElementById("srFeedback");
 
-  const mixed = srState.clef === "mixed";
   let delay = correct ? 700 : 1400;
 
   srState.total++;
@@ -1266,20 +1278,19 @@ function checkAnswer(btn) {
     feedback.textContent = `Correct! ${currentNote.letter}${currentNote.octave} 🔥`;
     feedback.className = "sr-feedback good";
 
-    if (mixed) {
-      if (mixedRunStart === null) mixedRunStart = Date.now();
-      mixedRunIndex++;
-      if (mixedRunIndex >= MIXED_RUN_LENGTH) {
-        const elapsed = Date.now() - mixedRunStart;
-        const isRecord = !srState.bestMixedMs || elapsed < srState.bestMixedMs;
-        if (isRecord) srState.bestMixedMs = elapsed;
-        feedback.textContent = isRecord
-          ? `🏆 NEW RECORD! Perfect run in ${formatClock(elapsed / 1000)}`
-          : `✅ Perfect run in ${formatClock(elapsed / 1000)} (record ${formatClock(srState.bestMixedMs / 1000)})`;
-        feedback.className = "sr-feedback good";
-        resetMixedRun();
-        delay = 2600;
-      }
+    if (runStart === null) runStart = Date.now();
+    runIndex++;
+    if (runIndex >= runDeck.length) {
+      const elapsed = Date.now() - runStart;
+      const prev = srState.bestMs[srState.clef];
+      const isRecord = !prev || elapsed < prev;
+      if (isRecord) srState.bestMs[srState.clef] = elapsed;
+      feedback.textContent = isRecord
+        ? `🏆 NEW RECORD! All ${runDeck.length} notes in ${formatClock(elapsed / 1000)}`
+        : `✅ Perfect run in ${formatClock(elapsed / 1000)} (record ${formatClock(srState.bestMs[srState.clef] / 1000)})`;
+      feedback.className = "sr-feedback good";
+      startRun();
+      delay = 2600;
     }
   } else {
     playBonkSound();
@@ -1287,11 +1298,9 @@ function checkAnswer(btn) {
     btn.classList.add("wrong");
     const rightBtn = document.querySelector(`.note-btn[data-letter="${currentNote.letter}"]`);
     if (rightBtn) rightBtn.classList.add("correct");
-    feedback.textContent = mixed
-      ? `That was ${currentNote.letter}${currentNote.octave} — run reset, starting over`
-      : `That was ${currentNote.letter}${currentNote.octave}`;
+    feedback.textContent = `That was ${currentNote.letter}${currentNote.octave} — run reset, starting over`;
     feedback.className = "sr-feedback bad";
-    if (mixed) resetMixedRun();
+    startRun();
   }
   saveSR();
   updateSRStats();
@@ -1308,7 +1317,7 @@ document.querySelectorAll(".clef-select .tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     srState.clef = btn.dataset.clef;
     syncClefButtons();
-    resetMixedRun();
+    startRun();
     srSessionStart = Date.now();
     saveSR();
     updateSRTimer();
