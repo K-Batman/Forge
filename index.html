@@ -1218,8 +1218,13 @@ function drawStaff(note, clef) {
     svgContent += `<line x1="${noteX - 10}" y1="${ly}" x2="${noteX + 10}" y2="${ly}" stroke="#333" stroke-width="1"/>`;
   });
 
-  // note head
-  svgContent += `<ellipse cx="${noteX}" cy="${noteY}" rx="7" ry="5.5" fill="#222"/>`;
+  // Note head. In real engraving a notehead is exactly ONE staff space tall
+  // and slightly wider than tall, tilted. Sizing it relative to `spacing`
+  // keeps "on a line" vs "in a space" unambiguous -- an oversized head
+  // spills across both neighbouring lines and makes D/E look identical.
+  const headRy = spacing * 0.5;
+  const headRx = spacing * 0.66;
+  svgContent += `<ellipse cx="${noteX}" cy="${noteY}" rx="${headRx}" ry="${headRy}" fill="#222" transform="rotate(-20 ${noteX} ${noteY})"/>`;
 
   svg.innerHTML = svgContent;
 }
