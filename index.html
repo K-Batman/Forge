@@ -46,20 +46,133 @@
     max-width: 640px;
     margin: 0 auto;
   }
-  .habit-card {
+
+  /* ---- Habits board (Skylight-style day view) ---- */
+  #tab-habits.active {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .day-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
     background: var(--card);
     border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+  }
+  .day-info { flex: 1; min-width: 0; }
+  .day-date {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .day-progress-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 3px;
+  }
+  .day-ring-wrap {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+  }
+  .day-ring { width: 56px; height: 56px; }
+  #dayRingFill { transition: stroke-dashoffset 0.35s ease; }
+  .day-ring-pct {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+  .edit-toggle {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .edit-toggle.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0f1117;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  @media (min-width: 820px) {
+    .board { grid-template-columns: 1fr 1fr; align-items: start; }
+  }
+  .col-title {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--muted);
+  }
+  .add-tile {
+    width: 100%;
+    background: transparent;
+    border: 2px dashed var(--card-border);
+    color: var(--muted);
+    padding: 16px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .add-tile:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .habit-card {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-left: 6px solid var(--tile, var(--accent));
     border-radius: 16px;
     padding: 18px 20px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
     gap: 16px;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, opacity 0.2s;
   }
   .habit-card.done {
     border-color: var(--good);
+    border-left-color: var(--good);
   }
+  .remove-btn {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid #0f1117;
+    background: #ff5c5c;
+    color: #0f1117;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .remove-btn:active { transform: scale(0.9); }
   .habit-icon {
     font-size: 2rem;
     width: 52px;
@@ -112,23 +225,6 @@
     transform: scale(0.9);
   }
   .streak-flame {
-    color: var(--accent);
-  }
-  .footer-actions {
-    text-align: center;
-    margin-top: 30px;
-  }
-  .add-btn {
-    background: transparent;
-    border: 1px dashed var(--card-border);
-    color: var(--muted);
-    padding: 12px 20px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 0.9rem;
-  }
-  .add-btn:hover {
-    border-color: var(--accent);
     color: var(--accent);
   }
   dialog {
@@ -256,29 +352,26 @@
   .report-row .value {
     font-weight: 600;
   }
-  .section-title {
-    margin: 28px 0 12px;
-    color: var(--muted);
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
   .task-card {
+    position: relative;
     background: var(--card);
     border: 1px solid var(--card-border);
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
+    border-left: 6px solid var(--tile, var(--accent));
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
   .task-card.done {
-    opacity: 0.7;
+    opacity: 0.65;
     border-color: var(--good);
+    border-left-color: var(--good);
   }
   .task-card.late {
     border-color: #ff5c5c;
+    border-left-color: #ff5c5c;
   }
   .task-main {
     flex: 1;
@@ -286,27 +379,15 @@
   }
   .task-name {
     font-weight: 600;
+    font-size: 1.02rem;
   }
   .task-meta {
     color: var(--muted);
-    font-size: 0.78rem;
-    margin-top: 2px;
+    font-size: 0.8rem;
+    margin-top: 3px;
   }
   .task-meta.late-text {
     color: #ff8a8a;
-  }
-  .mini-btn {
-    background: transparent;
-    border: 1px dashed var(--card-border);
-    color: var(--muted);
-    padding: 9px 12px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 0.82rem;
-  }
-  .mini-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
   }
   .tabs {
     display: flex;
@@ -504,15 +585,38 @@
   </div>
 
   <div id="tab-habits" class="tab-panel active">
-    <div id="habitList"></div>
+    <div class="day-header">
+      <div class="day-info">
+        <div class="day-date" id="dayDate">Today</div>
+        <div class="day-progress-text" id="dayProgressText">0 of 0 done</div>
+      </div>
+      <div class="day-ring-wrap">
+        <svg class="day-ring" viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="19" fill="none" stroke="#262a38" stroke-width="5"/>
+          <circle id="dayRingFill" cx="22" cy="22" r="19" fill="none" stroke="var(--good)"
+                  stroke-width="5" stroke-linecap="round" transform="rotate(-90 22 22)"
+                  stroke-dasharray="119.4" stroke-dashoffset="119.4"/>
+        </svg>
+        <span class="day-ring-pct" id="dayRingPct">0%</span>
+      </div>
+      <button class="edit-toggle" id="editToggle">Edit</button>
+    </div>
+
+    <div class="board">
+      <section class="board-col">
+        <h3 class="col-title">Habits</h3>
+        <div id="habitList"></div>
+        <button class="add-tile" id="addHabitBtn">+ Add a habit</button>
+      </section>
+
+      <section class="board-col">
+        <h3 class="col-title">Chores &amp; reminders</h3>
+        <div id="taskSection"></div>
+        <button class="add-tile" id="addTaskBtn">+ Add chore/reminder</button>
+      </section>
+    </div>
 
     <div id="weeklyReports"></div>
-
-    <div id="taskSection"></div>
-
-    <div class="footer-actions">
-      <button class="add-btn" id="addHabitBtn">+ Add a habit</button>
-    </div>
   </div>
 
   <div id="tab-sightread" class="tab-panel">
@@ -605,6 +709,10 @@
 
 const STORAGE_KEY = "forge_habits_v1";
 const TASKS_KEY = "forge_tasks_v1";
+// Default habits get topped up on load so new built-ins appear for existing
+// users. That must not resurrect ones Kaius deliberately deleted, so we
+// remember which defaults he removed.
+const REMOVED_DEFAULTS_KEY = "forge_removed_defaults_v1";
 
 const DEFAULT_HABITS = [
   { id: "bible", name: "Bible Reading", icon: "📖", log: {} },
@@ -652,15 +760,39 @@ function loadHabits() {
   if (!raw) return structuredClone(DEFAULT_HABITS);
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length) {
+    // An empty array is a real state (everything deleted), not a missing save.
+    if (Array.isArray(parsed)) {
       const migrated = parsed.map(migrateHabit);
+      const removed = loadRemovedDefaults();
       DEFAULT_HABITS.forEach(defaultHabit => {
-        if (!migrated.some(h => h.id === defaultHabit.id)) migrated.push(structuredClone(defaultHabit));
+        const alreadyThere = migrated.some(h => h.id === defaultHabit.id);
+        if (!alreadyThere && !removed.includes(defaultHabit.id)) {
+          migrated.push(structuredClone(defaultHabit));
+        }
       });
       return migrated;
     }
   } catch (e) {}
   return structuredClone(DEFAULT_HABITS);
+}
+
+function loadRemovedDefaults() {
+  try {
+    const raw = localStorage.getItem(REMOVED_DEFAULTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function rememberRemovedDefault(id) {
+  if (!DEFAULT_HABITS.some(h => h.id === id)) return;
+  const removed = loadRemovedDefaults();
+  if (!removed.includes(id)) {
+    removed.push(id);
+    localStorage.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify(removed));
+  }
 }
 
 function saveHabits(habits) {
@@ -887,19 +1019,31 @@ function repeatLabel(task) {
   return task.dueTime ? `One time by ${task.dueTime}` : "One time";
 }
 
+// Skylight-ish colour accents, assigned per tile by position so the board
+// reads as distinct cards at a glance.
+const TILE_COLORS = ["#ff7a1a", "#3ddc84", "#4aa8ff", "#c77dff", "#ffd166", "#ff6b9d", "#2ec4b6"];
+const tileColor = i => TILE_COLORS[i % TILE_COLORS.length];
+
+let editMode = false;
+
+function removeButton(kind, id) {
+  return editMode ? `<button class="remove-btn" data-remove-${kind}="${id}" title="Remove">✕</button>` : "";
+}
+
 function renderTasks() {
   const box = document.getElementById("taskSection");
-  let html = `<h3 class="section-title">Chores + reminders</h3>`;
+  let html = "";
 
   if (!tasks.length) {
-    html += `<div class="empty-state">No tasks yet. Add a chore or reminder below.</div>`;
+    html = `<div class="empty-state">No chores yet.</div>`;
   } else {
-    tasks.forEach(task => {
+    tasks.forEach((task, i) => {
       const key = periodKeyForTask(task);
       const done = !!task.done[key];
       const late = taskIsLate(task);
       html += `
-        <div class="task-card ${done ? "done" : ""} ${late ? "late" : ""}">
+        <div class="task-card ${done ? "done" : ""} ${late ? "late" : ""}" style="--tile:${tileColor(i)}">
+          ${removeButton("task", task.id)}
           <div class="habit-icon">${task.icon}</div>
           <div class="task-main">
             <div class="task-name">${escapeHtml(task.name)}</div>
@@ -911,13 +1055,23 @@ function renderTasks() {
     });
   }
 
-  html += `<button class="mini-btn" id="addTaskBtn">+ Add chore/reminder</button>`;
   box.innerHTML = html;
 
   box.querySelectorAll("[data-task-id]").forEach(btn => {
     btn.addEventListener("click", () => toggleTask(btn.dataset.taskId));
   });
-  document.getElementById("addTaskBtn").addEventListener("click", openTaskDialog);
+  box.querySelectorAll("[data-remove-task]").forEach(btn => {
+    btn.addEventListener("click", () => removeTask(btn.dataset.removeTask));
+  });
+}
+
+function removeTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  if (!confirm(`Remove "${task.name}"?`)) return;
+  tasks = tasks.filter(t => t.id !== id);
+  saveTasks(tasks);
+  render();
 }
 
 function toggleTask(id) {
@@ -930,18 +1084,60 @@ function toggleTask(id) {
   renderTasks();
 }
 
+function removeHabit(id) {
+  const habit = habits.find(h => h.id === id);
+  if (!habit) return;
+  const streak = calcStreak(habit.log);
+  const warn = streak > 0
+    ? `Remove "${habit.name}"? You'd lose a ${streak} day streak.`
+    : `Remove "${habit.name}"?`;
+  if (!confirm(warn)) return;
+  habits = habits.filter(h => h.id !== id);
+  rememberRemovedDefault(id);
+  saveHabits(habits);
+  render();
+}
+
+// Everything due today: every habit, plus chores whose period is today.
+function renderDayHeader() {
+  const today = todayStr();
+  const dateEl = document.getElementById("dayDate");
+  if (dateEl) {
+    dateEl.textContent = new Date().toLocaleDateString(undefined, {
+      weekday: "long", month: "long", day: "numeric",
+    });
+  }
+
+  let total = habits.length;
+  let done = habits.filter(h => h.log[today]).length;
+  tasks.forEach(task => {
+    total++;
+    if (task.done[periodKeyForTask(task)]) done++;
+  });
+
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const textEl = document.getElementById("dayProgressText");
+  if (textEl) textEl.textContent = `${done} of ${total} done today`;
+  const pctEl = document.getElementById("dayRingPct");
+  if (pctEl) pctEl.textContent = pct + "%";
+  const ring = document.getElementById("dayRingFill");
+  if (ring) {
+    const circumference = 2 * Math.PI * 19;
+    ring.setAttribute("stroke-dashoffset", String(circumference * (1 - pct / 100)));
+  }
+}
+
 function render() {
   const list = document.getElementById("habitList");
   list.innerHTML = "";
 
-  if (!habits.length) {
-    list.innerHTML = `<div class="empty-state">No habits yet. Add one below to start forging. 🔥</div>`;
-    return;
-  }
-
   const today = todayStr();
 
-  habits.forEach(habit => {
+  if (!habits.length) {
+    list.innerHTML = `<div class="empty-state">No habits yet. Add one to start forging. 🔥</div>`;
+  }
+
+  habits.forEach((habit, i) => {
     const doneToday = !!habit.log[today];
     const streak = calcStreak(habit.log);
     const total = calcTotal(habit.log);
@@ -949,7 +1145,9 @@ function render() {
 
     const card = document.createElement("div");
     card.className = "habit-card" + (doneToday ? " done" : "");
+    card.style.setProperty("--tile", tileColor(i));
     card.innerHTML = `
+      ${removeButton("habit", habit.id)}
       <div class="habit-icon">${habit.icon}</div>
       <div class="habit-info">
         <h2>${escapeHtml(habit.name)}</h2>
@@ -973,9 +1171,13 @@ function render() {
   list.querySelectorAll(".sw-btn").forEach(btn => {
     btn.addEventListener("click", () => toggleStopwatch(btn.dataset.swId));
   });
+  list.querySelectorAll("[data-remove-habit]").forEach(btn => {
+    btn.addEventListener("click", () => removeHabit(btn.dataset.removeHabit));
+  });
 
   renderWeeklyReports();
   renderTasks();
+  renderDayHeader();
 }
 
 function toggleToday(id) {
@@ -1036,7 +1238,18 @@ document.getElementById("saveTaskDialog").addEventListener("click", () => {
   tasks.push({ id, name, icon, repeat, dueTime, done: {} });
   saveTasks(tasks);
   taskDialog.close();
-  renderTasks();
+  render();
+});
+
+document.getElementById("addTaskBtn").addEventListener("click", openTaskDialog);
+
+// Edit mode reveals a remove button on every habit and chore.
+document.getElementById("editToggle").addEventListener("click", () => {
+  editMode = !editMode;
+  const btn = document.getElementById("editToggle");
+  btn.classList.toggle("active", editMode);
+  btn.textContent = editMode ? "Done" : "Edit";
+  render();
 });
 
 /* ---------- Tabs ---------- */
