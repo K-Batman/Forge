@@ -114,20 +114,6 @@
   .streak-flame {
     color: var(--accent);
   }
-  .calendar {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    margin-top: 10px;
-  }
-  .cal-day {
-    aspect-ratio: 1;
-    border-radius: 4px;
-    background: #1f2330;
-  }
-  .cal-day.hit {
-    background: var(--good);
-  }
   .footer-actions {
     text-align: center;
     margin-top: 30px;
@@ -349,8 +335,10 @@
   .tab-panel.active {
     display: block;
   }
-  /* Sight Reading breaks out of the narrow .wrap column and fills the
-     viewport -- it's a practice mode, not a list item. */
+  /* ---- Practice tabs (Sight Reading + Ear Training) ----
+     Both break out of the narrow .wrap column and fill the viewport;
+     they're practice modes, not list items. Everything below prefixed
+     .practice- / .mode- / .note- is shared by both tabs. */
   #tab-sightread.active,
   #tab-ear.active {
     width: 100vw;
@@ -362,7 +350,7 @@
     display: flex;
     flex-direction: column;
   }
-  .sr-card {
+  .practice-card {
     background: var(--card);
     border: 1px solid var(--card-border);
     border-radius: 16px;
@@ -375,25 +363,26 @@
     display: flex;
     flex-direction: column;
   }
-  .sr-stats {
+  .practice-stats {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 40px;
+    gap: 10px 28px;
     margin-bottom: 18px;
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     color: var(--muted);
   }
-  .sr-stats b {
+  .practice-stats b {
     color: var(--text);
     font-size: 1.3rem;
   }
-  .clef-select {
+  .mode-select {
     display: flex;
     justify-content: center;
     gap: 12px;
     margin-bottom: 20px;
   }
-  .clef-select .tab-btn {
+  .mode-select .tab-btn {
     padding: 13px 30px;
     font-size: 1.15rem;
   }
@@ -446,14 +435,14 @@
     color: #0f1117;
     border-color: #ff5c5c;
   }
-  .sr-feedback {
+  .practice-feedback {
     min-height: 34px;
     font-size: 1.3rem;
     margin-bottom: 14px;
     font-weight: 600;
   }
-  .sr-feedback.good { color: var(--good); }
-  .sr-feedback.bad { color: #ff8a8a; }
+  .practice-feedback.good { color: var(--good); }
+  .practice-feedback.bad { color: #ff8a8a; }
   .ear-stage {
     background: #1b1f2b;
     border: 1px solid var(--card-border);
@@ -496,7 +485,7 @@
   }
   @media (min-width: 700px) {
     .note-btn { font-size: 2.4rem; padding: 36px 0; }
-    .sr-card { padding: 36px; }
+    .practice-card { padding: 36px; }
     .ear-emoji { font-size: 6.5rem; }
   }
 </style>
@@ -527,16 +516,16 @@
   </div>
 
   <div id="tab-sightread" class="tab-panel">
-    <div class="sr-card">
-      <div class="sr-stats">
+    <div class="practice-card">
+      <div class="practice-stats">
         <span>Time: <b id="srTimer">0:00</b></span>
-        <span id="srProgressWrap">Run: <b id="srProgress">0/0</b></span>
+        <span>Run: <b id="srProgress">0/0</b></span>
         <span>Streak: <b id="srStreak">0</b></span>
-        <span id="srBestWrap">Best: <b id="srBest">0</b></span>
-        <span id="srRecordWrap">Record: <b id="srRecord">--</b></span>
+        <span>Best: <b id="srBest">0</b></span>
+        <span>Record: <b id="srRecord">--</b></span>
         <span>Accuracy: <b id="srAccuracy">0%</b></span>
       </div>
-      <div class="clef-select">
+      <div class="mode-select">
         <button class="tab-btn" data-clef="treble">Treble 🎵</button>
         <button class="tab-btn" data-clef="bass">Bass 🎵</button>
         <button class="tab-btn" data-clef="mixed">Mixed ⚡</button>
@@ -544,14 +533,14 @@
       <div class="staff-wrap">
         <svg id="staffSvg" viewBox="0 -25 200 175" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
-      <div class="sr-feedback" id="srFeedback">What note is this?</div>
+      <div class="practice-feedback" id="srFeedback">What note is this?</div>
       <div class="answer-grid" id="srAnswers"></div>
     </div>
   </div>
 
   <div id="tab-ear" class="tab-panel">
-    <div class="sr-card">
-      <div class="sr-stats">
+    <div class="practice-card">
+      <div class="practice-stats">
         <span>Time: <b id="etTimer">0:00</b></span>
         <span>Run: <b id="etProgress">0/0</b></span>
         <span>Streak: <b id="etStreak">0</b></span>
@@ -559,7 +548,7 @@
         <span>Record: <b id="etRecord">--</b></span>
         <span>Accuracy: <b id="etAccuracy">0%</b></span>
       </div>
-      <div class="clef-select">
+      <div class="mode-select">
         <button class="tab-btn" data-etrange="low">Low 🔉</button>
         <button class="tab-btn" data-etrange="middle">Middle 🎹</button>
         <button class="tab-btn" data-etrange="high">High 🔊</button>
@@ -569,7 +558,7 @@
         <div class="ear-emoji" id="etEmoji">👂</div>
         <button class="replay-btn" id="etReplay">▶ Play again <span class="key-hint">(space)</span></button>
       </div>
-      <div class="sr-feedback" id="etFeedback">Listen, then pick the note</div>
+      <div class="practice-feedback" id="etFeedback">Listen, then pick the note</div>
       <div class="answer-grid" id="etAnswers"></div>
     </div>
   </div>
@@ -1101,27 +1090,41 @@ function updateSRTimer() {
   el.textContent = formatClock(secs);
 }
 
-// Every natural note between the low and high bound of a clef's range.
-function allNotesForClef(clef) {
-  const range = CLEF_RANGES[clef];
+/* Shared by both practice tabs: build the list of every natural note in a
+   range, and shuffle it into a run deck. */
+
+// range is { low: {letter, octave}, high: {letter, octave} }.
+// `extra` is merged into every note (Sight Reading tags each note's clef).
+function notesInRange(range, extra) {
   const lowStep = absStep(range.low.letter, range.low.octave);
   const highStep = absStep(range.high.letter, range.high.octave);
   const notes = [];
   for (let step = lowStep; step <= highStep; step++) {
-    notes.push({ letter: LETTER_ORDER[step % 7], octave: Math.floor(step / 7), step, clef });
+    notes.push(Object.assign(
+      { letter: LETTER_ORDER[step % 7], octave: Math.floor(step / 7), step },
+      extra
+    ));
   }
   return notes;
 }
 
-function buildRunDeck(mode) {
-  const notes = mode === "mixed"
-    ? allNotesForClef("treble").concat(allNotesForClef("bass"))
-    : allNotesForClef(mode);
-  for (let i = notes.length - 1; i > 0; i--) {
+// Fisher-Yates, in place
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    const tmp = notes[i]; notes[i] = notes[j]; notes[j] = tmp;
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
   }
-  return notes;
+  return arr;
+}
+
+function allNotesForClef(clef) {
+  return notesInRange(CLEF_RANGES[clef], { clef });
+}
+
+function buildRunDeck(mode) {
+  return shuffle(mode === "mixed"
+    ? allNotesForClef("treble").concat(allNotesForClef("bass"))
+    : allNotesForClef(mode));
 }
 
 function startRun() {
@@ -1188,8 +1191,8 @@ function playBonkSound() {
 }
 
 const CLEF_RANGES = {
-  treble: { low: { letter: "C", octave: 4 }, high: { letter: "C", octave: 6 }, refLetter: "E", refOctave: 4, symbol: "\uD834\uDD1E" },
-  bass: { low: { letter: "E", octave: 2 }, high: { letter: "C", octave: 4 }, refLetter: "G", refOctave: 2, symbol: "\uD834\uDD22" },
+  treble: { low: { letter: "C", octave: 4 }, high: { letter: "C", octave: 6 }, refLetter: "E", refOctave: 4 },
+  bass: { low: { letter: "E", octave: 2 }, high: { letter: "C", octave: 4 }, refLetter: "G", refOctave: 2 },
 };
 
 function absStep(letter, octave) {
@@ -1336,7 +1339,7 @@ function nextCard() {
   fb.textContent = runStart === null
     ? `Perfect run: all ${runDeck.length} notes, no mistakes. Go!`
     : "What note is this?";
-  fb.className = "sr-feedback";
+  fb.className = "practice-feedback";
   renderAnswerGrid();
   updateSRStats();
 }
@@ -1359,7 +1362,7 @@ function checkAnswer(btn) {
     srState.best = Math.max(srState.best, srState.streak);
     btn.classList.add("correct");
     feedback.textContent = `Correct! ${currentNote.letter}${currentNote.octave} 🔥`;
-    feedback.className = "sr-feedback good";
+    feedback.className = "practice-feedback good";
 
     if (runStart === null) runStart = Date.now();
     runIndex++;
@@ -1371,7 +1374,7 @@ function checkAnswer(btn) {
       feedback.textContent = isRecord
         ? `🏆 NEW RECORD! All ${runDeck.length} notes in ${formatClock(elapsed / 1000)}`
         : `✅ Perfect run in ${formatClock(elapsed / 1000)} (record ${formatClock(srState.bestMs[srState.clef] / 1000)})`;
-      feedback.className = "sr-feedback good";
+      feedback.className = "practice-feedback good";
       startRun();
       delay = 2600;
     }
@@ -1382,7 +1385,7 @@ function checkAnswer(btn) {
     const rightBtn = document.querySelector(`.note-btn[data-letter="${currentNote.letter}"]`);
     if (rightBtn) rightBtn.classList.add("correct");
     feedback.textContent = `That was ${currentNote.letter}${currentNote.octave} — run reset, starting over`;
-    feedback.className = "sr-feedback bad";
+    feedback.className = "practice-feedback bad";
     startRun();
   }
   saveSR();
@@ -1391,12 +1394,12 @@ function checkAnswer(btn) {
 }
 
 function syncClefButtons() {
-  document.querySelectorAll(".clef-select .tab-btn").forEach(b => {
+  document.querySelectorAll(".mode-select .tab-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.clef === srState.clef);
   });
 }
 
-document.querySelectorAll(".clef-select .tab-btn").forEach(btn => {
+document.querySelectorAll(".mode-select .tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     srState.clef = btn.dataset.clef;
     syncClefButtons();
@@ -1458,24 +1461,8 @@ let etStart = null;
 let etCurrent = null;
 let etLocked = false;
 
-function etNotesForRange(range) {
-  const r = ET_RANGES[range];
-  const lowStep = absStep(r.low.letter, r.low.octave);
-  const highStep = absStep(r.high.letter, r.high.octave);
-  const notes = [];
-  for (let step = lowStep; step <= highStep; step++) {
-    notes.push({ letter: LETTER_ORDER[step % 7], octave: Math.floor(step / 7), step });
-  }
-  return notes;
-}
-
 function etBuildDeck(range) {
-  const notes = etNotesForRange(range);
-  for (let i = notes.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = notes[i]; notes[i] = notes[j]; notes[j] = tmp;
-  }
-  return notes;
+  return shuffle(notesInRange(ET_RANGES[range]));
 }
 
 function etStartRun() {
@@ -1529,7 +1516,7 @@ function etNextCard() {
   fb.textContent = etStart === null
     ? `Perfect run: all ${etDeck.length} notes by ear. Go!`
     : "Listen, then pick the note";
-  fb.className = "sr-feedback";
+  fb.className = "practice-feedback";
   etRenderAnswers();
   etUpdateStats();
   etPlayCurrent();
@@ -1551,7 +1538,7 @@ function etCheckAnswer(btn) {
     etState.best = Math.max(etState.best, etState.streak);
     btn.classList.add("correct");
     feedback.textContent = `Correct! ${etCurrent.letter}${etCurrent.octave} 🔥`;
-    feedback.className = "sr-feedback good";
+    feedback.className = "practice-feedback good";
 
     if (etStart === null) etStart = Date.now();
     etIndex++;
@@ -1563,7 +1550,7 @@ function etCheckAnswer(btn) {
       feedback.textContent = isRecord
         ? `🏆 NEW RECORD! All ${etDeck.length} notes by ear in ${formatClock(elapsed / 1000)}`
         : `✅ Perfect run in ${formatClock(elapsed / 1000)} (record ${formatClock(etState.bestMs[etState.range] / 1000)})`;
-      feedback.className = "sr-feedback good";
+      feedback.className = "practice-feedback good";
       etStartRun();
       delay = 2600;
     }
@@ -1574,7 +1561,7 @@ function etCheckAnswer(btn) {
     const rightBtn = document.querySelector(`.note-btn[data-etletter="${etCurrent.letter}"]`);
     if (rightBtn) rightBtn.classList.add("correct");
     feedback.textContent = `That was ${etCurrent.letter}${etCurrent.octave} — run reset, starting over`;
-    feedback.className = "sr-feedback bad";
+    feedback.className = "practice-feedback bad";
     etStartRun();
   }
   saveET();
