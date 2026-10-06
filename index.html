@@ -9,7 +9,10 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <meta name="theme-color" content="#040b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- "black" paints the status bar solid black. "black-translucent" lets the
+     page show through, but iOS needs a solid background colour to sample and
+     falls back to WHITE if it can't find one, which is what happened here. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Forge">
 <link rel="manifest" href="manifest.json">
 <style>
@@ -2431,8 +2434,23 @@ document.addEventListener("keydown", (e) => {
 
 // Installable app: the service worker makes Forge work with no signal.
 if ("serviceWorker" in navigator) {
+  // When a new service worker takes over, reload once so an installed app
+  // actually shows the update instead of serving the old copy forever.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      reg.update();
+      // check again when the app is reopened or brought back to the front
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update();
+      });
+    }).catch(() => {
       // No service worker (e.g. opened over plain http) just means no
       // offline support -- the app itself still works.
     });

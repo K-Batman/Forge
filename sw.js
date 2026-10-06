@@ -1,7 +1,7 @@
 /* Forge service worker.
    Bump CACHE whenever the shipped files change, otherwise phones keep
    serving the old copy from cache forever. */
-const CACHE = "forge-v1";
+const CACHE = "forge-v3";
 
 const SHELL = [
   "./",
