@@ -405,6 +405,8 @@
     font-size: 0.88rem;
     font-weight: 600;
   }
+  .tab-icon { margin-right: 5px; }
+
   .tab-btn.active {
     background: var(--accent);
     border-color: var(--accent);
@@ -428,6 +430,8 @@
     margin-right: calc(-50vw + 50%);
     padding: 0 20px;
     min-height: calc(100vh - 40px);
+    /* --tabbar is 0 on desktop, the bottom bar's height on phones */
+    min-height: calc(100vh - 40px - var(--tabbar, 0px));
     display: flex;
     flex-direction: column;
   }
@@ -569,6 +573,122 @@
     .practice-card { padding: 36px; }
     .ear-emoji { font-size: 6.5rem; }
   }
+  /* ---- Phone: iOS-style tab bar pinned to the bottom ----
+     Thumbs live at the bottom of a phone, so the tabs go there too.
+     Icon over label, full-width bar, safe-area aware for the home
+     indicator on newer iPhones. */
+  @media (max-width: 700px) {
+    :root {
+      --tabbar: calc(76px + env(safe-area-inset-bottom, 0px));
+    }
+    body {
+      padding-bottom: var(--tabbar);
+    }
+    .tabs {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 50;
+      margin: 0;
+      gap: 0;
+      background: rgba(18, 21, 30, 0.93);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid var(--card-border);
+      padding: 7px 4px calc(7px + env(safe-area-inset-bottom, 0px));
+    }
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      border-radius: 10px;
+      padding: 5px 2px;
+      color: var(--muted);
+      font-size: 0.66rem;
+      font-weight: 600;
+      line-height: 1.15;
+      min-height: 50px;
+    }
+    .tab-btn.active {
+      background: none;
+      border: none;
+      color: var(--accent);
+    }
+    .tab-btn:active { background: rgba(255, 255, 255, 0.06); }
+    .tab-icon {
+      margin: 0;
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+    .tab-label { white-space: nowrap; }
+
+    /* Keep a whole practice card on screen above the tab bar, so the
+       A-G buttons are always reachable without scrolling. */
+    #tab-sightread.active,
+    #tab-ear.active {
+      padding: 0 12px;
+      min-height: 0;
+    }
+    .practice-card {
+      padding: 14px;
+      min-height: 0;
+    }
+    .practice-stats {
+      gap: 6px 16px;
+      font-size: 0.82rem;
+      margin-bottom: 10px;
+    }
+    .practice-stats b { font-size: 0.9rem; }
+    .mode-select {
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .mode-select .tab-btn {
+      flex: 0 0 auto;
+      flex-direction: row;
+      min-height: 0;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      color: var(--muted);
+    }
+    .mode-select .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0f1117;
+    }
+    .staff-wrap {
+      min-height: 150px;
+      padding: 8px 0;
+      margin-bottom: 12px;
+    }
+    .staff-wrap svg { max-height: 190px; }
+    .ear-stage {
+      min-height: 150px;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .ear-emoji { font-size: 3.2rem; }
+    .replay-btn { padding: 12px 22px; font-size: 1rem; }
+    .practice-feedback {
+      font-size: 0.95rem;
+      min-height: 24px;
+      margin-bottom: 10px;
+    }
+    .answer-grid { gap: 8px; margin-bottom: 0; }
+    .note-btn {
+      padding: 14px 0;
+      font-size: 1.3rem;
+      border-radius: 10px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -578,11 +698,17 @@
     <p id="tagline">Build the habit. Every day.</p>
   </header>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="habits">Habits</button>
-    <button class="tab-btn" data-tab="sightread">🎼 Sight Reading</button>
-    <button class="tab-btn" data-tab="ear">👂 Ear Training</button>
-  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="habits">
+      <span class="tab-icon">✅</span><span class="tab-label">Habits</span>
+    </button>
+    <button class="tab-btn" data-tab="sightread">
+      <span class="tab-icon">🎼</span><span class="tab-label">Sight Reading</span>
+    </button>
+    <button class="tab-btn" data-tab="ear">
+      <span class="tab-icon">👂</span><span class="tab-label">Ear Training</span>
+    </button>
+  </nav>
 
   <div id="tab-habits" class="tab-panel active">
     <div class="day-header">
