@@ -429,6 +429,43 @@
     color: var(--text);
     font-size: 0.95rem;
   }
+  .day-picker { margin-bottom: 10px; }
+  .day-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .day-toggle {
+    flex: 1 0 auto;
+    min-width: 44px;
+    padding: 8px 6px;
+    border-radius: 9px;
+    border: 1px solid var(--card-border);
+    background: var(--card-raise);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .day-toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+  .dialog-hint {
+    margin: 2px 0 12px;
+    font-size: 0.76rem;
+    color: var(--muted);
+    min-height: 1.1em;
+  }
+  .habit-when {
+    font-size: 0.74rem;
+    color: var(--muted);
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
   dialog label {
     font-size: 0.8rem;
     color: var(--muted);
@@ -1016,6 +1053,35 @@
   <input id="hName" placeholder="e.g. Read a book" maxlength="30">
   <label for="hIcon">Icon (emoji)</label>
   <input id="hIcon" placeholder="📖" maxlength="4">
+
+  <label for="hType">Type</label>
+  <select id="hType">
+    <option value="check">Just check it off</option>
+    <option value="time">Time it with a stopwatch</option>
+  </select>
+
+  <label for="hRepeat">When</label>
+  <select id="hRepeat">
+    <option value="daily">Every day</option>
+    <option value="days">Only certain days</option>
+    <option value="weekly">Once a week</option>
+  </select>
+
+  <div id="hDayPicker" class="day-picker" hidden>
+    <label>Which days</label>
+    <div class="day-toggles">
+      <button type="button" class="day-toggle" data-day="1">Mon</button>
+      <button type="button" class="day-toggle" data-day="2">Tue</button>
+      <button type="button" class="day-toggle" data-day="3">Wed</button>
+      <button type="button" class="day-toggle" data-day="4">Thu</button>
+      <button type="button" class="day-toggle" data-day="5">Fri</button>
+      <button type="button" class="day-toggle" data-day="6">Sat</button>
+      <button type="button" class="day-toggle" data-day="0">Sun</button>
+    </div>
+  </div>
+
+  <p id="hHint" class="dialog-hint"></p>
+
   <div class="dialog-actions">
     <button class="btn-cancel" id="cancelDialog">Cancel</button>
     <button class="btn-save" id="saveDialog">Add</button>
@@ -1155,19 +1221,101 @@ function saveTasks(tasks) {
   localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
 }
 
-function calcStreak(log) {
-  let streak = 0;
-  let i = 0;
-  // if today isn't done yet, streak counts backward from yesterday
-  while (true) {
-    const day = todayStr(-i);
-    if (log[day]) {
-      streak++;
-      i++;
-    } else {
-      if (i === 0) return 0; // today not done, no streak credit yet
-      break;
+/* ---------- Scheduling ----------
+  habit.schedule is one of:
+    { kind: "daily" }                 every day
+    { kind: "days", days: [1,3,5] }   only those weekdays (0 = Sunday)
+    { kind: "weekly" }                once per week, any day
+  Anything saved before scheduling existed is treated as daily.
+----------------------------------- */
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function scheduleOf(habit) {
+  const s = habit.schedule;
+  if (!s || !s.kind) return { kind: "daily" };
+  if (s.kind === "days") {
+    const days = Array.isArray(s.days) ? s.days.filter(d => d >= 0 && d <= 6) : [];
+    // a "certain days" habit with no days picked would never be due
+    return days.length ? { kind: "days", days } : { kind: "daily" };
+  }
+  if (s.kind === "weekly") return { kind: "weekly" };
+  return { kind: "daily" };
+}
+
+// Is this habit due on the given date?
+function dueOn(habit, date) {
+  const s = scheduleOf(habit);
+  if (s.kind === "daily") return true;
+  if (s.kind === "days") return s.days.includes(date.getDay());
+  return true; // weekly: due any day until it's done for the week
+}
+
+// A weekly habit counts as done for the whole week once ticked any day.
+function doneForPeriod(habit, date) {
+  const s = scheduleOf(habit);
+  if (s.kind === "weekly") {
+    return weekDates(startOfWeek(date)).some(k => habit.log[k]);
+  }
+  return !!habit.log[dateKey(date)];
+}
+
+// Shown on the board today? Weekly habits drop off once done for the week.
+function showToday(habit) {
+  const now = new Date();
+  const s = scheduleOf(habit);
+  if (s.kind === "weekly") return true;
+  return dueOn(habit, now);
+}
+
+function scheduleLabel(habit) {
+  const s = scheduleOf(habit);
+  if (s.kind === "daily") return "Every day";
+  if (s.kind === "weekly") return "Once a week";
+  if (s.days.length === 7) return "Every day";
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const picked = order.filter(d => s.days.includes(d));
+  if (picked.length === 5 && [1,2,3,4,5].every(d => s.days.includes(d))) return "Weekdays";
+  if (picked.length === 2 && s.days.includes(0) && s.days.includes(6)) return "Weekends";
+  return picked.map(d => DAY_NAMES[d]).join(" ");
+}
+
+/* ---------- Streaks ----------
+  A streak counts consecutive DUE periods that were completed, so a
+  Mon/Wed/Fri habit doesn't lose its streak on a Tuesday, and a weekly
+  habit counts weeks rather than days.
+----------------------------------- */
+
+function calcStreak(log, habit) {
+  const s = habit ? scheduleOf(habit) : { kind: "daily" };
+
+  if (s.kind === "weekly") {
+    let streak = 0;
+    for (let w = 0; w < 520; w++) {
+      const monday = startOfWeek(new Date());
+      monday.setDate(monday.getDate() - w * 7);
+      const done = weekDates(monday).some(k => log[k]);
+      if (done) {
+        streak++;
+      } else if (w === 0) {
+        continue;   // this week is still open, so it can't break the run
+      } else {
+        break;
+      }
     }
+    return streak;
+  }
+
+  let streak = 0;
+  const cursor = new Date();
+  for (let i = 0; i < 3650; i++) {
+    const isDue = s.kind === "daily" || s.days.includes(cursor.getDay());
+    if (isDue) {
+      if (log[dateKey(cursor)]) streak++;
+      else if (i === 0) { /* today still open, keep looking back */ }
+      else break;
+    }
+    cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
 }
@@ -1176,22 +1324,41 @@ function calcTotal(log) {
   return Object.values(log).filter(Boolean).length;
 }
 
-function calcBest(log) {
-  const days = Object.keys(log).filter(d => log[d]).sort();
-  if (!days.length) return 0;
-  let best = 1, cur = 1;
-  for (let i = 1; i < days.length; i++) {
-    const prev = new Date(days[i - 1]);
-    const cur_d = new Date(days[i]);
-    const diff = (cur_d - prev) / 86400000;
-    if (diff === 1) {
-      cur++;
-      best = Math.max(best, cur);
-    } else {
-      cur = 1;
+// Best run ever. Walks the due periods between the first tick and today,
+// so gaps on days the habit was never due don't count against it.
+function calcBest(log, habit) {
+  const ticks = Object.keys(log).filter(d => log[d]).sort();
+  if (!ticks.length) return 0;
+  const s = habit ? scheduleOf(habit) : { kind: "daily" };
+
+  if (s.kind === "weekly") {
+    const weeks = [...new Set(ticks.map(d => dateKey(startOfWeek(new Date(d + "T00:00:00")))))].sort();
+    let best = 1, run = 1;
+    for (let i = 1; i < weeks.length; i++) {
+      const gap = (new Date(weeks[i]) - new Date(weeks[i - 1])) / 604800000;
+      run = gap === 1 ? run + 1 : 1;
+      best = Math.max(best, run);
     }
+    return Math.max(best, calcStreak(log, habit));
   }
-  return Math.max(best, calcStreak(log));
+
+  let best = 0, run = 0;
+  const cursor = new Date(ticks[0] + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  while (cursor <= today) {
+    const isDue = s.kind === "daily" || s.days.includes(cursor.getDay());
+    if (isDue) {
+      if (log[dateKey(cursor)]) {
+        run++;
+        best = Math.max(best, run);
+      } else if (dateKey(cursor) !== dateKey(today)) {
+        run = 0;   // a missed due day breaks it, but today is still open
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return Math.max(best, calcStreak(log, habit));
 }
 
 /* ---------- Stopwatch + weekly report helpers ---------- */
@@ -1424,9 +1591,10 @@ function toggleTask(id) {
 function removeHabit(id) {
   const habit = habits.find(h => h.id === id);
   if (!habit) return;
-  const streak = calcStreak(habit.log);
+  const streak = calcStreak(habit.log, habit);
+  const unit = scheduleOf(habit).kind === "weekly" ? "week" : "day";
   const warn = streak > 0
-    ? `Remove "${habit.name}"? You'd lose a ${streak} day streak.`
+    ? `Remove "${habit.name}"? You'd lose a ${streak} ${unit} streak.`
     : `Remove "${habit.name}"?`;
   if (!confirm(warn)) return;
   habits = habits.filter(h => h.id !== id);
@@ -1445,8 +1613,10 @@ function renderDayHeader() {
     });
   }
 
-  let total = habits.length;
-  let done = habits.filter(h => h.log[today]).length;
+  // only count what's actually due today
+  const dueToday = habits.filter(showToday);
+  let total = dueToday.length;
+  let done = dueToday.filter(h => doneForPeriod(h, new Date())).length;
   tasks.forEach(task => {
     total++;
     if (task.done[periodKeyForTask(task)]) done++;
@@ -1474,29 +1644,37 @@ function render() {
     list.innerHTML = `<div class="empty-state">No habits yet. Add one to start forging. 🔥</div>`;
   }
 
-  habits.forEach((habit, i) => {
-    const doneToday = !!habit.log[today];
-    const streak = calcStreak(habit.log);
+  const dueNow = habits.filter(showToday);
+  if (habits.length && !dueNow.length) {
+    list.innerHTML = `<div class="empty-state">Nothing scheduled for today. 🎉</div>`;
+  }
+
+  dueNow.forEach((habit, i) => {
+    const done = doneForPeriod(habit, new Date());
+    const streak = calcStreak(habit.log, habit);
     const total = calcTotal(habit.log);
-    const best = calcBest(habit.log);
+    const best = calcBest(habit.log, habit);
+    const sched = scheduleOf(habit);
+    const streakWord = sched.kind === "weekly" ? "week" : "day";
 
     const card = document.createElement("div");
-    card.className = "habit-card" + (doneToday ? " done" : "");
-    card.style.setProperty("--tile", tileColor(i));
+    card.className = "habit-card" + (done ? " done" : "");
+    card.style.setProperty("--tile", tileColor(habits.indexOf(habit)));
     card.innerHTML = `
       ${removeButton("habit", habit.id)}
       <div class="habit-icon">${habit.icon}</div>
       <div class="habit-info">
         <h2>${escapeHtml(habit.name)}</h2>
         <div class="habit-stats">
-          ${habit.trackTime ? "" : `<span class="streak-flame">🔥 <b>${streak}</b> day streak</span>`}
+          ${sched.kind === "daily" ? "" : `<span class="habit-when">${scheduleLabel(habit)}</span>`}
+          ${habit.trackTime ? "" : `<span class="streak-flame">🔥 <b>${streak}</b> ${streakWord} streak</span>`}
           <span>Best: <b>${best}</b></span>
           <span>Total: <b>${total}</b></span>
           ${habit.trackTime ? renderStopwatchRow(habit) : ""}
         </div>
       </div>
-      <button class="check-btn ${doneToday ? "checked" : ""}" data-id="${habit.id}">
-        ${doneToday ? "✓" : ""}
+      <button class="check-btn ${done ? "checked" : ""}" data-id="${habit.id}">
+        ${done ? "✓" : ""}
       </button>
     `;
     list.appendChild(card);
@@ -1521,6 +1699,20 @@ function toggleToday(id) {
   const habit = habits.find(h => h.id === id);
   if (!habit) return;
   const today = todayStr();
+
+  // A weekly habit may have been ticked on a different day this week;
+  // unchecking should clear that tick, not just today's.
+  if (scheduleOf(habit).kind === "weekly" && !habit.log[today]) {
+    const thisWeek = weekDates(startOfWeek(new Date()));
+    const existing = thisWeek.find(k => habit.log[k]);
+    if (existing) {
+      delete habit.log[existing];
+      saveHabits(habits);
+      render();
+      return;
+    }
+  }
+
   if (habit.log[today]) {
     delete habit.log[today];
   } else {
@@ -1538,9 +1730,48 @@ function escapeHtml(str) {
 
 // Add habit dialog
 const dialog = document.getElementById("habitDialog");
+const hRepeat = document.getElementById("hRepeat");
+const hType = document.getElementById("hType");
+const hDayPicker = document.getElementById("hDayPicker");
+const hHint = document.getElementById("hHint");
+
+function pickedDays() {
+  return [...document.querySelectorAll(".day-toggle.on")].map(b => Number(b.dataset.day));
+}
+
+function refreshHabitDialog() {
+  const repeat = hRepeat.value;
+  hDayPicker.hidden = repeat !== "days";
+
+  const timed = hType.value === "time";
+  let hint = "";
+  if (repeat === "daily") hint = timed ? "Shows every day with a stopwatch." : "Shows every day.";
+  else if (repeat === "weekly") hint = "Shows until you tick it once, then rests until next week.";
+  else {
+    const days = pickedDays();
+    hint = days.length
+      ? "Only shows on: " + [1,2,3,4,5,6,0].filter(d => days.includes(d)).map(d => DAY_NAMES[d]).join(", ")
+      : "Pick at least one day, or it'll never show up.";
+  }
+  hHint.textContent = hint;
+}
+
+hRepeat.addEventListener("change", refreshHabitDialog);
+hType.addEventListener("change", refreshHabitDialog);
+document.querySelectorAll(".day-toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    btn.classList.toggle("on");
+    refreshHabitDialog();
+  });
+});
+
 document.getElementById("addHabitBtn").addEventListener("click", () => {
   document.getElementById("hName").value = "";
   document.getElementById("hIcon").value = "";
+  hType.value = "check";
+  hRepeat.value = "daily";
+  document.querySelectorAll(".day-toggle").forEach(b => b.classList.remove("on"));
+  refreshHabitDialog();
   dialog.showModal();
 });
 document.getElementById("cancelDialog").addEventListener("click", () => dialog.close());
@@ -1548,8 +1779,23 @@ document.getElementById("saveDialog").addEventListener("click", () => {
   const name = document.getElementById("hName").value.trim();
   const icon = document.getElementById("hIcon").value.trim() || "⭐";
   if (!name) return;
+
+  const repeat = hRepeat.value;
+  const days = pickedDays();
+  // "certain days" with nothing picked would never appear; don't let that save
+  if (repeat === "days" && !days.length) {
+    hHint.textContent = "Pick at least one day first.";
+    return;
+  }
+
+  const schedule = repeat === "days" ? { kind: "days", days } : { kind: repeat };
   const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now().toString(36);
-  habits.push({ id, name, icon, log: {} });
+  const habit = { id, name, icon, log: {}, schedule };
+  if (hType.value === "time") {
+    habit.trackTime = true;
+    habit.practice = { seconds: {}, sessionStart: null, history: [] };
+  }
+  habits.push(habit);
   saveHabits(habits);
   dialog.close();
   render();
