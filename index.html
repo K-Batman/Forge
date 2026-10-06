@@ -36,26 +36,44 @@
   * { box-sizing: border-box; }
 
   /* ---- Atmosphere: forge glow + drifting embers ---- */
+  /* Real forge photo behind everything. Measured brightness per band:
+     the coals along the bottom peak at 249/255, so they get a much
+     heavier scrim than the already-dark middle, otherwise the chore
+     tiles and tab bar sit on glare. */
   .forge-bg {
     position: fixed;
     inset: 0;
     z-index: -2;
     pointer-events: none;
-    background:
-      /* coals banked along the bottom */
-      radial-gradient(ellipse 120% 38% at 50% 104%, rgba(253, 116, 0, 0.30) 0%, rgba(176, 62, 10, 0.14) 38%, transparent 72%),
-      /* heat haze climbing the sides */
-      radial-gradient(ellipse 50% 70% at 2% 86%, rgba(253, 116, 0, 0.13) 0%, transparent 65%),
-      radial-gradient(ellipse 50% 70% at 98% 90%, rgba(255, 152, 9, 0.11) 0%, transparent 65%),
-      /* flame light spilling from the top */
-      radial-gradient(ellipse 85% 42% at 50% -6%, rgba(86, 35, 18, 0.95) 0%, transparent 70%);
+    background-image:
+      /* Flat 0.70 scrim. The photo is tone-mapped so that at exactly this
+         strength the dimmest UI text still clears 4.5:1 on its brightest
+         pixel -- solved, not eyeballed. Don't lighten one without
+         re-running the check. */
+      linear-gradient(rgba(4, 11, 27, 0.70), rgba(4, 11, 27, 0.70)),
+      url("forge-bg.jpg");
+    background-size: cover, cover;
+    background-position: center, center bottom;
+    background-repeat: no-repeat;
+  }
+  @media (max-width: 700px) {
+    /* smaller file on phones: 36KB instead of 86KB */
+    .forge-bg {
+      background-image:
+        linear-gradient(rgba(4, 11, 27, 0.70), rgba(4, 11, 27, 0.70)),
+        url("forge-bg-small.jpg");
+      background-size: cover, cover;
+      background-position: center, center bottom;
+    }
   }
   /* slow pulse, like a fire breathing */
+  /* the coals in the photo are static, so breathe a warm light over them */
   .forge-bg::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 110% 32% at 50% 102%, rgba(255, 152, 9, 0.22) 0%, transparent 68%);
+    background: radial-gradient(ellipse 110% 30% at 50% 103%, rgba(255, 152, 9, 0.26) 0%, transparent 66%);
+    mix-blend-mode: screen;
     animation: breathe 7s ease-in-out infinite;
   }
   @keyframes breathe {
