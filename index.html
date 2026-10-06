@@ -450,6 +450,32 @@
     color: var(--text);
     font-size: 0.95rem;
   }
+  .sync-dialog { max-width: 420px; }
+  .sync-box {
+    width: 100%;
+    background: var(--card-raise);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    padding: 8px 10px;
+    resize: vertical;
+    word-break: break-all;
+  }
+  .mini-action {
+    margin-top: 6px;
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mini-action:hover { border-color: var(--accent); color: var(--accent); }
+
   .day-picker { margin-bottom: 10px; }
   .day-toggles {
     display: flex;
@@ -999,6 +1025,7 @@
         </svg>
         <span class="day-ring-pct" id="dayRingPct">0%</span>
       </div>
+      <button class="edit-toggle" id="syncToggle" title="Move your data between devices">🔄</button>
       <button class="edit-toggle" id="editToggle">Edit</button>
     </div>
 
@@ -1106,6 +1133,27 @@
   <div class="dialog-actions">
     <button class="btn-cancel" id="cancelDialog">Cancel</button>
     <button class="btn-save" id="saveDialog">Add</button>
+  </div>
+</dialog>
+
+<dialog id="syncDialog" class="sync-dialog">
+  <h3 style="margin-top:0">Move data between devices</h3>
+  <p class="dialog-hint" style="min-height:0">
+    Copy the code from one device, paste it into the other. Nothing is lost:
+    both devices' habits, streaks and records get combined.
+  </p>
+
+  <label for="syncOut">1. Your code (copy this)</label>
+  <textarea id="syncOut" class="sync-box" readonly rows="3"></textarea>
+  <button class="mini-action" id="syncCopy">Copy code</button>
+
+  <label for="syncIn" style="margin-top:14px;display:block">2. Paste a code from your other device</label>
+  <textarea id="syncIn" class="sync-box" rows="3" placeholder="Paste the code here"></textarea>
+  <p class="dialog-hint" id="syncMsg"></p>
+
+  <div class="dialog-actions">
+    <button class="btn-cancel" id="syncClose">Close</button>
+    <button class="btn-save" id="syncApply">Merge it in</button>
   </div>
 </dialog>
 
@@ -2433,6 +2481,188 @@ document.addEventListener("keydown", (e) => {
   if (!NOTE_LETTERS.includes(letter)) return;
   e.preventDefault();
   checkAnswer(document.querySelector(`.note-btn[data-letter="${letter}"]`));
+});
+
+/* ---------- Moving data between devices ----------
+  Everything lives in this browser's storage, so a phone and a computer
+  each keep their own copy. This exports all of it as one code and merges
+  a code from the other device back in.
+
+  Merging, never overwriting: if you tick things on both devices, a
+  straight copy would throw one side away. Rules:
+    habit/chore ticks  -> union, a tick on either device counts
+    practice seconds   -> the larger number for each day
+    weekly reports     -> union by week, larger total wins
+    streak records     -> the better one
+    best times         -> the faster one
+----------------------------------------------- */
+
+const SYNC_KEYS = [STORAGE_KEY, TASKS_KEY, REMOVED_DEFAULTS_KEY, SR_KEY, ET_KEY];
+
+function exportData() {
+  const payload = { v: 1, at: new Date().toISOString(), data: {} };
+  SYNC_KEYS.forEach(k => {
+    const raw = localStorage.getItem(k);
+    if (raw !== null) payload.data[k] = raw;
+  });
+  // encodeURIComponent first so emoji in habit names survive base64
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+function mergeLogs(a = {}, b = {}) {
+  const out = Object.assign({}, a);
+  Object.keys(b).forEach(d => { if (b[d]) out[d] = true; });
+  return out;
+}
+
+function mergeSeconds(a = {}, b = {}) {
+  const out = Object.assign({}, a);
+  Object.keys(b).forEach(d => {
+    out[d] = Math.max(Number(out[d]) || 0, Number(b[d]) || 0);
+  });
+  return out;
+}
+
+function mergeHistory(a = [], b = []) {
+  const byWeek = new Map();
+  [...a, ...b].forEach(e => {
+    if (!e || !e.weekStart) return;
+    const prev = byWeek.get(e.weekStart);
+    if (!prev || (e.seconds || 0) > (prev.seconds || 0)) byWeek.set(e.weekStart, e);
+  });
+  return [...byWeek.values()].sort((x, y) => y.weekStart.localeCompare(x.weekStart)).slice(0, 12);
+}
+
+function mergeHabits(mine, theirs) {
+  const out = mine.map(h => Object.assign({}, h));
+  const byId = new Map(out.map(h => [h.id, h]));
+  theirs.forEach(t => {
+    const existing = byId.get(t.id);
+    if (!existing) { out.push(t); return; }
+    existing.log = mergeLogs(existing.log, t.log);
+    if (existing.practice || t.practice) {
+      const ep = existing.practice || { seconds: {}, sessionStart: null, history: [] };
+      const tp = t.practice || { seconds: {}, history: [] };
+      existing.practice = {
+        seconds: mergeSeconds(ep.seconds, tp.seconds),
+        sessionStart: ep.sessionStart,     // a running timer is local to this device
+        history: mergeHistory(ep.history, tp.history),
+      };
+    }
+    if (!existing.schedule && t.schedule) existing.schedule = t.schedule;
+    if (!existing.trackTime && t.trackTime) existing.trackTime = true;
+  });
+  return out;
+}
+
+function mergeTasks(mine, theirs) {
+  const out = mine.map(t => Object.assign({}, t));
+  const byId = new Map(out.map(t => [t.id, t]));
+  theirs.forEach(t => {
+    const existing = byId.get(t.id);
+    if (!existing) { out.push(t); return; }
+    existing.done = mergeLogs(existing.done, t.done);
+  });
+  return out;
+}
+
+function mergeBestMs(mine = {}, theirs = {}) {
+  const out = Object.assign({}, mine);
+  Object.keys(theirs).forEach(k => {
+    const a = out[k], b = theirs[k];
+    if (b == null) return;
+    out[k] = (a == null) ? b : Math.min(a, b);   // faster time wins
+  });
+  return out;
+}
+
+function mergePractice(mine, theirs) {
+  const out = Object.assign({}, mine);
+  out.best = Math.max(mine.best || 0, theirs.best || 0);
+  out.streak = Math.max(mine.streak || 0, theirs.streak || 0);
+  // counts are per-device tallies; take the larger rather than summing,
+  // which would double-count anything already synced once
+  out.correct = Math.max(mine.correct || 0, theirs.correct || 0);
+  out.total = Math.max(mine.total || 0, theirs.total || 0);
+  if (out.correct > out.total) out.total = out.correct;
+  out.bestMs = mergeBestMs(mine.bestMs, theirs.bestMs);
+  return out;
+}
+
+function importData(code) {
+  let payload;
+  try {
+    payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+  } catch (e) {
+    return { ok: false, msg: "That code didn't look right. Copy the whole thing and try again." };
+  }
+  if (!payload || !payload.data) {
+    return { ok: false, msg: "That code is missing its data." };
+  }
+
+  const read = (key, fallback) => {
+    try { return payload.data[key] ? JSON.parse(payload.data[key]) : fallback; }
+    catch (e) { return fallback; }
+  };
+
+  let habitCount = 0, taskCount = 0;
+
+  const theirHabits = read(STORAGE_KEY, null);
+  if (Array.isArray(theirHabits)) {
+    habits = mergeHabits(habits, theirHabits.map(migrateHabit));
+    saveHabits(habits);
+    habitCount = theirHabits.length;
+  }
+
+  const theirTasks = read(TASKS_KEY, null);
+  if (Array.isArray(theirTasks)) {
+    tasks = mergeTasks(tasks, theirTasks);
+    saveTasks(tasks);
+    taskCount = theirTasks.length;
+  }
+
+  const theirRemoved = read(REMOVED_DEFAULTS_KEY, null);
+  if (Array.isArray(theirRemoved)) {
+    const merged = [...new Set([...loadRemovedDefaults(), ...theirRemoved])];
+    localStorage.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify(merged));
+  }
+
+  const theirSR = read(SR_KEY, null);
+  if (theirSR) { srState = mergePractice(srState, normalizeSR(theirSR)); saveSR(); }
+
+  const theirET = read(ET_KEY, null);
+  if (theirET) { etState = mergePractice(etState, normalizeET(theirET)); saveET(); }
+
+  render();
+  return { ok: true, msg: `Merged in ${habitCount} habits and ${taskCount} chores. Nothing was lost.` };
+}
+
+const syncDialog = document.getElementById("syncDialog");
+document.getElementById("syncToggle").addEventListener("click", () => {
+  document.getElementById("syncOut").value = exportData();
+  document.getElementById("syncIn").value = "";
+  document.getElementById("syncMsg").textContent = "";
+  syncDialog.showModal();
+});
+document.getElementById("syncClose").addEventListener("click", () => syncDialog.close());
+document.getElementById("syncCopy").addEventListener("click", async () => {
+  const box = document.getElementById("syncOut");
+  const msg = document.getElementById("syncMsg");
+  try {
+    await navigator.clipboard.writeText(box.value);
+    msg.textContent = "Code copied. Paste it into Forge on your other device.";
+  } catch (e) {
+    box.select();
+    msg.textContent = "Press Ctrl/Cmd+C to copy the selected code.";
+  }
+});
+document.getElementById("syncApply").addEventListener("click", () => {
+  const code = document.getElementById("syncIn").value;
+  const msg = document.getElementById("syncMsg");
+  if (!code.trim()) { msg.textContent = "Paste a code from your other device first."; return; }
+  const res = importData(code);
+  msg.textContent = res.msg;
+  if (res.ok) document.getElementById("syncOut").value = exportData();
 });
 
 // Installable app: the service worker makes Forge work with no signal.
