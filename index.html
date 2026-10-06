@@ -42,8 +42,24 @@
      showed through at the top of the screen -- in the safe area above the
      page on a phone, and whenever the page rubber-bands past its edge.
      body alone isn't enough: it only paints its own box. */
+  /* The forge photo lives on html, which paints as the page canvas. The
+     canvas is always the bottom layer, so nothing can cover it -- unlike a
+     negative z-index element, which body's own background paints over.
+     That's what made the photo vanish. It also fills the status bar and
+     overscroll area, so this fixes the white strip at the same time.
+
+     The 0.30 scrim is deliberate: the photo's highlights are too bright
+     for text to sit on directly, and the labels that do sit on it get
+     their own backing chips (see .backdrop-label). */
   html {
-    background: var(--bg-deep);
+    background-color: var(--bg-deep);
+    background-image:
+      linear-gradient(rgba(4, 11, 27, 0.30), rgba(4, 11, 27, 0.30)),
+      url("forge-bg.jpg");
+    background-size: cover, cover;
+    background-position: center, center bottom;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color-scheme: dark;   /* keeps scrollbars and overscroll dark too */
   }
 
@@ -52,31 +68,20 @@
      the coals along the bottom peak at 249/255, so they get a much
      heavier scrim than the already-dark middle, otherwise the chore
      tiles and tab bar sit on glare. */
+  /* The photo itself is on html now. This layer only carries the warm
+     light that breathes over the coals, so it stays fully transparent. */
   .forge-bg {
     position: fixed;
     inset: 0;
-    z-index: -2;
+    z-index: -1;
     pointer-events: none;
-    background-image:
-      /* Light 0.30 scrim so the forge actually reads. Measured: no text
-         colour can clear 4.5:1 over this photo's highlights by dimming
-         alone (white tops out at 3.46 even at 0.50), so readability is
-         handled by backing the few labels that sit on the backdrop --
-         see .backdrop-label -- not by flattening the picture. */
-      linear-gradient(rgba(4, 11, 27, 0.30), rgba(4, 11, 27, 0.30)),
-      url("forge-bg.jpg");
-    background-size: cover, cover;
-    background-position: center, center bottom;
-    background-repeat: no-repeat;
   }
   @media (max-width: 700px) {
-    /* smaller file on phones: 36KB instead of 86KB */
-    .forge-bg {
+    /* smaller file on phones: 50KB instead of 126KB */
+    html {
       background-image:
         linear-gradient(rgba(4, 11, 27, 0.30), rgba(4, 11, 27, 0.30)),
         url("forge-bg-small.jpg");
-      background-size: cover, cover;
-      background-position: center, center bottom;
     }
   }
   /* slow pulse, like a fire breathing */
@@ -146,14 +151,12 @@
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    /* Only transparent-stop gradients here. Every layer on body paints on
+       top of the canvas, so anything opaque hides the photo -- an opaque
+       gradient was exactly the bug. */
     background:
-      radial-gradient(ellipse 70% 40% at 50% 0%, var(--ember) 0%, transparent 70%),
-      radial-gradient(circle at top, #0a1428 0%, var(--bg) 55%, var(--bg-deep) 100%);
+      radial-gradient(ellipse 70% 40% at 50% 0%, var(--ember) 0%, transparent 70%);
     background-attachment: fixed;
-    /* NO background-color here. body's background paints ABOVE negative
-       z-index children, so a solid colour hides .forge-bg entirely. The
-       dark fill that covers the status bar lives on html instead, which
-       paints below it. */
     color: var(--text);
     min-height: 100vh;
     min-height: 100dvh;   /* dvh accounts for the phone's address bar */
