@@ -1178,6 +1178,71 @@
 </dialog>
 
 <script>
+/* ---------- Crash guard (must stay FIRST) ----------
+  Everything below this runs at the top level, so a single throw while
+  loading saved data kills the whole script and leaves a blank page --
+  which is exactly what happened. This block depends on nothing and
+  installs before any of it.
+
+  Escape hatch: opening the app with ?reset=1 clears Forge's saved data,
+  which gets you back in even if the data itself is what's broken.
+--------------------------------------------------- */
+(function crashGuard() {
+  var KEYS = [
+    "forge_habits_v1",
+    "forge_tasks_v1",
+    "forge_removed_defaults_v1",
+    "forge_sightread_v1",
+    "forge_eartraining_v1"
+  ];
+
+  function dump() {
+    var data = {};
+    for (var i = 0; i < KEYS.length; i++) {
+      var v = null;
+      try { v = localStorage.getItem(KEYS[i]); } catch (e) {}
+      if (v !== null) data[KEYS[i]] = v;
+    }
+    try {
+      return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, data: data }))));
+    } catch (e) { return ""; }
+  }
+
+  if (location.search.indexOf("reset=1") !== -1) {
+    var backup = dump();
+    try { for (var i = 0; i < KEYS.length; i++) localStorage.removeItem(KEYS[i]); } catch (e) {}
+    try { if (backup) localStorage.setItem("forge_backup_before_reset", backup); } catch (e) {}
+  }
+
+  var shown = false;
+  window.addEventListener("error", function (e) {
+    if (shown) return;
+    shown = true;
+    var backup = dump();
+    document.body.innerHTML =
+      '<div style="max-width:540px;margin:10vh auto;padding:28px;border-radius:16px;' +
+      'background:#111e34;border:1px solid #1e3050;color:#eef2fa;' +
+      'font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.55">' +
+      '<h2 style="margin-top:0">Forge hit a snag</h2>' +
+      '<p style="color:#8a97b5">Something in the saved data stopped it loading. ' +
+      'Your data is backed up below first, then this will clear it and start clean.</p>' +
+      '<p style="color:#8a97b5;font-size:0.78rem;word-break:break-word">' +
+      String((e && e.message) || e) + '</p>' +
+      '<textarea readonly rows="3" style="width:100%;background:#16243d;color:#eef2fa;' +
+      'border:1px solid #1e3050;border-radius:8px;font-size:0.7rem;padding:8px">' + backup + '</textarea>' +
+      '<p style="color:#8a97b5;font-size:0.78rem">Copy that somewhere safe if you want to try ' +
+      'recovering it later.</p>' +
+      '<button id="forgeReset" style="background:#fd7400;color:#04101f;border:none;border-radius:10px;' +
+      'padding:13px 22px;font-weight:700;font-size:1rem;cursor:pointer">Clear data and reload</button>' +
+      '</div>';
+    var btn = document.getElementById("forgeReset");
+    if (btn) btn.addEventListener("click", function () {
+      try { for (var i = 0; i < KEYS.length; i++) localStorage.removeItem(KEYS[i]); } catch (e2) {}
+      location.href = location.pathname;
+    });
+  });
+})();
+
 /* ---------- Data model ----------
   Each habit: { id, name, icon, log: { "YYYY-MM-DD": true, ... } }
   Stored in localStorage under "forge_habits_v1"
