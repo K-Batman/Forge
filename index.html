@@ -2414,6 +2414,16 @@ document.addEventListener("keydown", (e) => {
   checkAnswer(document.querySelector(`.note-btn[data-letter="${letter}"]`));
 });
 
+// Installable app: the service worker makes Forge work with no signal.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {
+      // No service worker (e.g. opened over plain http) just means no
+      // offline support -- the app itself still works.
+    });
+  });
+}
+
 archiveCompletedWeeks();
 render();
 
