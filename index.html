@@ -46,11 +46,12 @@
     z-index: -2;
     pointer-events: none;
     background-image:
-      /* Flat 0.70 scrim. The photo is tone-mapped so that at exactly this
-         strength the dimmest UI text still clears 4.5:1 on its brightest
-         pixel -- solved, not eyeballed. Don't lighten one without
-         re-running the check. */
-      linear-gradient(rgba(4, 11, 27, 0.70), rgba(4, 11, 27, 0.70)),
+      /* Light 0.30 scrim so the forge actually reads. Measured: no text
+         colour can clear 4.5:1 over this photo's highlights by dimming
+         alone (white tops out at 3.46 even at 0.50), so readability is
+         handled by backing the few labels that sit on the backdrop --
+         see .backdrop-label -- not by flattening the picture. */
+      linear-gradient(rgba(4, 11, 27, 0.30), rgba(4, 11, 27, 0.30)),
       url("forge-bg.jpg");
     background-size: cover, cover;
     background-position: center, center bottom;
@@ -60,7 +61,7 @@
     /* smaller file on phones: 36KB instead of 86KB */
     .forge-bg {
       background-image:
-        linear-gradient(rgba(4, 11, 27, 0.70), rgba(4, 11, 27, 0.70)),
+        linear-gradient(rgba(4, 11, 27, 0.30), rgba(4, 11, 27, 0.30)),
         url("forge-bg-small.jpg");
       background-size: cover, cover;
       background-position: center, center bottom;
@@ -249,12 +250,33 @@
   @media (min-width: 820px) {
     .board { grid-template-columns: 1fr 1fr; align-items: start; }
   }
+  /* Anything sitting straight on the photo gets its own dark backing, so
+     its contrast is against this chip (verified 8.7:1) rather than
+     against whatever happens to be behind it. */
+  .backdrop-label {
+    display: inline-block;
+    background: rgba(4, 11, 27, 0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(253, 116, 0, 0.18);
+    border-radius: 999px;
+    padding: 6px 14px;
+    color: var(--text);
+  }
   .col-title {
     margin: 0 0 12px;
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.7px;
-    color: var(--muted);
+  }
+  header p#tagline {
+    display: inline-block;
+    background: rgba(4, 11, 27, 0.8);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 999px;
+    padding: 5px 16px;
+    color: var(--text);
   }
   .add-tile {
     width: 100%;
@@ -432,10 +454,16 @@
     color: var(--on-accent);
     font-weight: 600;
   }
+  /* sits straight on the photo, so it needs its own backing */
   .empty-state {
     text-align: center;
-    color: var(--muted);
-    padding: 40px 20px;
+    padding: 34px 20px;
+    color: var(--text);
+    background: rgba(4, 11, 27, 0.82);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px dashed var(--card-border);
+    border-radius: 16px;
   }
 
   .stopwatch-row {
@@ -927,13 +955,13 @@
 
     <div class="board">
       <section class="board-col">
-        <h3 class="col-title">Habits</h3>
+        <h3 class="col-title backdrop-label">Habits</h3>
         <div id="habitList"></div>
         <button class="add-tile" id="addHabitBtn">+ Add a habit</button>
       </section>
 
       <section class="board-col">
-        <h3 class="col-title">Chores &amp; reminders</h3>
+        <h3 class="col-title backdrop-label">Chores &amp; reminders</h3>
         <div id="taskSection"></div>
         <button class="add-tile" id="addTaskBtn">+ Add chore/reminder</button>
       </section>
@@ -1297,7 +1325,7 @@ function renderWeeklyReports() {
   }
   let html = "";
   trackedHabits.forEach(habit => {
-    html += `<div class="weekly-reports"><h3>${escapeHtml(habit.name)} — Weekly Reports</h3>`;
+    html += `<div class="weekly-reports"><h3 class="backdrop-label">${escapeHtml(habit.name)} — Weekly Reports</h3>`;
     habit.practice.history.forEach((entry, i) => {
       const start = new Date(entry.weekStart + "T00:00:00");
       const label = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
