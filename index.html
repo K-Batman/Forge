@@ -1219,17 +1219,49 @@ function dateKey(d) {
   return d.toISOString().slice(0, 10);
 }
 
-// Migrate old saved habits so new fields exist without wiping progress.
+// Repair a habit into a shape the rest of the app can safely render.
+// This runs on every load and on every import, so bad data can never get
+// far enough to white-screen the app. A missing log used to do exactly
+// that, and because the broken value was saved first, it crashed on every
+// load afterwards.
 function migrateHabit(habit) {
+  if (!habit || typeof habit !== "object") return null;
+
+  if (typeof habit.id !== "string" || !habit.id) return null;
+  if (typeof habit.name !== "string") habit.name = String(habit.name || "Habit");
+  if (typeof habit.icon !== "string" || !habit.icon) habit.icon = "⭐";
+
+  // the one that caused the white screen
+  if (!habit.log || typeof habit.log !== "object" || Array.isArray(habit.log)) {
+    habit.log = {};
+  }
+
+  if (habit.schedule && typeof habit.schedule !== "object") delete habit.schedule;
+
   if (habit.trackTime && !habit.practice) {
     habit.practice = { seconds: {}, sessionStart: null, history: [] };
   }
   if (habit.practice) {
-    if (!habit.practice.seconds) habit.practice.seconds = {};
-    if (!habit.practice.history) habit.practice.history = [];
+    if (typeof habit.practice !== "object") {
+      habit.practice = { seconds: {}, sessionStart: null, history: [] };
+    }
+    if (!habit.practice.seconds || typeof habit.practice.seconds !== "object") habit.practice.seconds = {};
+    if (!Array.isArray(habit.practice.history)) habit.practice.history = [];
     if (habit.practice.sessionStart === undefined) habit.practice.sessionStart = null;
   }
   return habit;
+}
+
+// Repair a chore the same way.
+function migrateTask(task) {
+  if (!task || typeof task !== "object") return null;
+  if (typeof task.id !== "string" || !task.id) return null;
+  if (typeof task.name !== "string") task.name = String(task.name || "Chore");
+  if (typeof task.icon !== "string" || !task.icon) task.icon = "✅";
+  if (!task.done || typeof task.done !== "object" || Array.isArray(task.done)) task.done = {};
+  if (!["daily", "weekly", "once"].includes(task.repeat)) task.repeat = "daily";
+  if (typeof task.dueTime !== "string") task.dueTime = "";
+  return task;
 }
 
 function loadHabits() {
@@ -1239,7 +1271,7 @@ function loadHabits() {
     const parsed = JSON.parse(raw);
     // An empty array is a real state (everything deleted), not a missing save.
     if (Array.isArray(parsed)) {
-      const migrated = parsed.map(migrateHabit);
+      const migrated = parsed.map(migrateHabit).filter(Boolean);
       const removed = loadRemovedDefaults();
       DEFAULT_HABITS.forEach(defaultHabit => {
         const alreadyThere = migrated.some(h => h.id === defaultHabit.id);
@@ -1281,7 +1313,7 @@ function loadTasks() {
   if (!raw) return structuredClone(DEFAULT_TASKS);
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) return parsed.map(migrateTask).filter(Boolean);
   } catch (e) {}
   return structuredClone(DEFAULT_TASKS);
 }
@@ -2607,19 +2639,27 @@ function importData(code) {
 
   let habitCount = 0, taskCount = 0;
 
+  // Build the merged result first and only save once everything has been
+  // repaired. Saving mid-merge is what let a bad habit get written to
+  // storage and then crash on every future load.
   const theirHabits = read(STORAGE_KEY, null);
+  let nextHabits = null;
   if (Array.isArray(theirHabits)) {
-    habits = mergeHabits(habits, theirHabits.map(migrateHabit));
-    saveHabits(habits);
-    habitCount = theirHabits.length;
+    const clean = theirHabits.map(migrateHabit).filter(Boolean);
+    nextHabits = mergeHabits(habits, clean).map(migrateHabit).filter(Boolean);
+    habitCount = clean.length;
   }
 
   const theirTasks = read(TASKS_KEY, null);
+  let nextTasks = null;
   if (Array.isArray(theirTasks)) {
-    tasks = mergeTasks(tasks, theirTasks);
-    saveTasks(tasks);
-    taskCount = theirTasks.length;
+    const clean = theirTasks.map(migrateTask).filter(Boolean);
+    nextTasks = mergeTasks(tasks, clean).map(migrateTask).filter(Boolean);
+    taskCount = clean.length;
   }
+
+  if (nextHabits) { habits = nextHabits; saveHabits(habits); }
+  if (nextTasks) { tasks = nextTasks; saveTasks(tasks); }
 
   const theirRemoved = read(REMOVED_DEFAULTS_KEY, null);
   if (Array.isArray(theirRemoved)) {
@@ -2635,6 +2675,52 @@ function importData(code) {
 
   render();
   return { ok: true, msg: `Merged in ${habitCount} habits and ${taskCount} chores. Nothing was lost.` };
+}
+
+/* If rendering ever throws, show a way out instead of a white screen. */
+function showRecovery(err) {
+  document.body.innerHTML =
+    '<div style="max-width:520px;margin:12vh auto;padding:28px;border-radius:16px;' +
+    'background:#111e34;border:1px solid #1e3050;color:#eef2fa;' +
+    'font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5">' +
+    '<h2 style="margin-top:0">Forge hit a snag</h2>' +
+    '<p style="color:#8a97b5">Something in the saved data stopped the app from drawing. ' +
+    'Your data is still here. Try repairing it first.</p>' +
+    '<p style="color:#8a97b5;font-size:0.8rem">' + String(err && err.message || err) + '</p>' +
+    '<button id="recRepair" style="background:#fd7400;color:#04101f;border:none;border-radius:10px;' +
+    'padding:12px 20px;font-weight:700;font-size:1rem;cursor:pointer;margin-right:10px">Repair and reload</button>' +
+    '<button id="recCopy" style="background:transparent;color:#8a97b5;border:1px solid #1e3050;' +
+    'border-radius:10px;padding:12px 20px;font-weight:600;cursor:pointer">Copy my data first</button>' +
+    '</div>';
+
+  document.getElementById("recRepair").addEventListener("click", () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const fixed = JSON.parse(raw).map(migrateHabit).filter(Boolean);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fixed));
+      }
+      const traw = localStorage.getItem(TASKS_KEY);
+      if (traw) {
+        const fixed = JSON.parse(traw).map(migrateTask).filter(Boolean);
+        localStorage.setItem(TASKS_KEY, JSON.stringify(fixed));
+      }
+    } catch (e) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    }
+    location.reload();
+  });
+
+  document.getElementById("recCopy").addEventListener("click", () => {
+    const dump = {};
+    [STORAGE_KEY, TASKS_KEY, REMOVED_DEFAULTS_KEY, SR_KEY, ET_KEY].forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) dump[k] = v;
+    });
+    const text = btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, data: dump }))));
+    navigator.clipboard.writeText(text).catch(() => {});
+    document.getElementById("recCopy").textContent = "Copied";
+  });
 }
 
 const syncDialog = document.getElementById("syncDialog");
@@ -2690,8 +2776,12 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-archiveCompletedWeeks();
-render();
+try {
+  archiveCompletedWeeks();
+  render();
+} catch (err) {
+  showRecovery(err);
+}
 
 setInterval(() => {
   if (document.getElementById("tab-sightread").classList.contains("active")) updateSRTimer();
