@@ -429,33 +429,6 @@
     color: var(--text);
     font-size: 0.95rem;
   }
-  /* Floating fullscreen toggle. Fixed so it's reachable from any tab,
-     and above the atmosphere layers but below dialogs. */
-  .fs-btn {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 40;
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border: 1px solid var(--card-border);
-    background: rgba(4, 11, 27, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: var(--muted);
-    font-size: 1.15rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
-  }
-  .fs-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-    box-shadow: 0 0 14px rgba(253, 116, 0, 0.3);
-  }
-  .fs-btn:active { transform: scale(0.93); }
-
   .day-picker { margin-bottom: 10px; }
   .day-toggles {
     display: flex;
@@ -971,8 +944,6 @@
   <span></span><span></span><span></span><span></span><span></span>
   <span></span><span></span><span></span>
 </div>
-
-<button id="fsBtn" class="fs-btn" title="Fullscreen" aria-label="Enter fullscreen" hidden>⛶</button>
 
 <div class="wrap">
   <header>
@@ -2442,65 +2413,6 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   checkAnswer(document.querySelector(`.note-btn[data-letter="${letter}"]`));
 });
-
-/* ---------- Fullscreen ----------
-  Hidden when it would be pointless or broken: an installed PWA is already
-  fullscreen, and iPhone Safari has no Fullscreen API at all (the answer
-  there is Add to Home Screen, which the app already supports).
------------------------------------ */
-(function setupFullscreen() {
-  const btn = document.getElementById("fsBtn");
-  if (!btn) return;
-
-  const root = document.documentElement;
-  const canFullscreen = !!(
-    root.requestFullscreen ||
-    root.webkitRequestFullscreen ||
-    root.msRequestFullscreen
-  );
-  const standalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true;
-
-  if (!canFullscreen || standalone) return;  // stays hidden
-  btn.hidden = false;
-
-  const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-
-  function enter() {
-    const fn = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
-    const r = fn.call(root);
-    if (r && r.catch) r.catch(() => {});
-  }
-  function leave() {
-    const fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
-    const r = fn.call(document);
-    if (r && r.catch) r.catch(() => {});
-  }
-
-  function sync() {
-    const full = isFull();
-    btn.textContent = full ? "⤡" : "⛶";
-    btn.title = full ? "Exit fullscreen (Esc)" : "Fullscreen";
-    btn.setAttribute("aria-label", btn.title);
-  }
-
-  btn.addEventListener("click", () => (isFull() ? leave() : enter()));
-  document.addEventListener("fullscreenchange", sync);
-  document.addEventListener("webkitfullscreenchange", sync);
-
-  // F key toggles too, but not while typing in the habit/chore dialogs
-  document.addEventListener("keydown", e => {
-    if (e.key !== "f" && e.key !== "F") return;
-    const tag = document.activeElement?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    if (document.activeElement?.isContentEditable) return;
-    e.preventDefault();
-    isFull() ? leave() : enter();
-  });
-
-  sync();
-})();
 
 // Installable app: the service worker makes Forge work with no signal.
 if ("serviceWorker" in navigator) {
