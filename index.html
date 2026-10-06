@@ -1221,6 +1221,37 @@
     var backup = dump();
     try { for (var i = 0; i < KEYS.length; i++) localStorage.removeItem(KEYS[i]); } catch (e) {}
     try { if (backup) localStorage.setItem("forge_backup_before_reset", backup); } catch (e) {}
+
+    // A stale service worker will happily keep serving an old copy of the
+    // app forever, which no amount of reloading fixes. Tear it and its
+    // caches down, then come back on a clean URL.
+    var jobs = [];
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(
+          navigator.serviceWorker.getRegistrations()
+            .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+            .catch(function () {})
+        );
+      }
+      if (window.caches && caches.keys) {
+        jobs.push(
+          caches.keys()
+            .then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })
+            .catch(function () {})
+        );
+      }
+    } catch (e) {}
+
+    // Don't throw here: the error handler below isn't installed yet, so a
+    // throw would leave a blank page if the redirect never fired. The
+    // storage keys are already gone, so letting the app boot fresh while
+    // the teardown finishes is harmless.
+    if (jobs.length) {
+      Promise.all(jobs).then(function () {
+        location.replace(location.pathname + "?fresh=" + Date.now());
+      });
+    }
   }
 
   var shown = false;
