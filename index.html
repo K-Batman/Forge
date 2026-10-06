@@ -150,7 +150,10 @@
       radial-gradient(ellipse 70% 40% at 50% 0%, var(--ember) 0%, transparent 70%),
       radial-gradient(circle at top, #0a1428 0%, var(--bg) 55%, var(--bg-deep) 100%);
     background-attachment: fixed;
-    background-color: var(--bg-deep);
+    /* NO background-color here. body's background paints ABOVE negative
+       z-index children, so a solid colour hides .forge-bg entirely. The
+       dark fill that covers the status bar lives on html instead, which
+       paints below it. */
     color: var(--text);
     min-height: 100vh;
     min-height: 100dvh;   /* dvh accounts for the phone's address bar */
