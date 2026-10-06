@@ -34,6 +34,84 @@
     --bad-soft: #ff9a86;
   }
   * { box-sizing: border-box; }
+
+  /* ---- Atmosphere: forge glow + drifting embers ---- */
+  .forge-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      /* coals banked along the bottom */
+      radial-gradient(ellipse 120% 38% at 50% 104%, rgba(253, 116, 0, 0.30) 0%, rgba(176, 62, 10, 0.14) 38%, transparent 72%),
+      /* heat haze climbing the sides */
+      radial-gradient(ellipse 50% 70% at 2% 86%, rgba(253, 116, 0, 0.13) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 70% at 98% 90%, rgba(255, 152, 9, 0.11) 0%, transparent 65%),
+      /* flame light spilling from the top */
+      radial-gradient(ellipse 85% 42% at 50% -6%, rgba(86, 35, 18, 0.95) 0%, transparent 70%);
+  }
+  /* slow pulse, like a fire breathing */
+  .forge-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 110% 32% at 50% 102%, rgba(255, 152, 9, 0.22) 0%, transparent 68%);
+    animation: breathe 7s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.35; transform: scaleY(0.94); }
+    50%      { opacity: 0.85; transform: scaleY(1.06); }
+  }
+
+  .embers {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .embers span {
+    position: absolute;
+    bottom: -14px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-hot);
+    box-shadow: 0 0 7px 2px rgba(253, 116, 0, 0.75);
+    opacity: 0;
+    animation: rise linear infinite;
+  }
+  @keyframes rise {
+    0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(0.5); }
+    8%   { opacity: 1; }
+    70%  { opacity: 0.85; }
+    100% { opacity: 0; transform: translate3d(var(--drift, 22px), -102vh, 0) scale(1.15); }
+  }
+  /* each ember gets its own lane, speed, size and drift */
+  .embers span:nth-child(1)  { left:  4%; animation-duration: 15s; animation-delay: 0s;    --drift:  34px; }
+  .embers span:nth-child(2)  { left: 11%; animation-duration: 20s; animation-delay: 2.4s;  --drift: -26px; width: 3px; height: 3px; }
+  .embers span:nth-child(3)  { left: 18%; animation-duration: 13s; animation-delay: 5.1s;  --drift:  18px; }
+  .embers span:nth-child(4)  { left: 25%; animation-duration: 23s; animation-delay: 1.2s;  --drift: -40px; width: 5px; height: 5px; }
+  .embers span:nth-child(5)  { left: 31%; animation-duration: 17s; animation-delay: 7.6s;  --drift:  28px; }
+  .embers span:nth-child(6)  { left: 38%; animation-duration: 12s; animation-delay: 3.3s;  --drift: -14px; width: 3px; height: 3px; }
+  .embers span:nth-child(7)  { left: 44%; animation-duration: 21s; animation-delay: 9.8s;  --drift:  44px; }
+  .embers span:nth-child(8)  { left: 50%; animation-duration: 16s; animation-delay: 0.8s;  --drift: -30px; }
+  .embers span:nth-child(9)  { left: 56%; animation-duration: 25s; animation-delay: 6.2s;  --drift:  22px; width: 5px; height: 5px; }
+  .embers span:nth-child(10) { left: 62%; animation-duration: 14s; animation-delay: 11.4s; --drift: -36px; width: 3px; height: 3px; }
+  .embers span:nth-child(11) { left: 69%; animation-duration: 19s; animation-delay: 4.5s;  --drift:  16px; }
+  .embers span:nth-child(12) { left: 75%; animation-duration: 22s; animation-delay: 8.7s;  --drift: -22px; }
+  .embers span:nth-child(13) { left: 81%; animation-duration: 15s; animation-delay: 13.1s; --drift:  38px; width: 3px; height: 3px; }
+  .embers span:nth-child(14) { left: 87%; animation-duration: 18s; animation-delay: 2.9s;  --drift: -18px; }
+  .embers span:nth-child(15) { left: 93%; animation-duration: 24s; animation-delay: 10.3s; --drift:  26px; width: 5px; height: 5px; }
+  .embers span:nth-child(16) { left: 97%; animation-duration: 13s; animation-delay: 6.9s;  --drift: -28px; }
+  .embers span:nth-child(17) { left: 66%; animation-duration: 27s; animation-delay: 15.2s; --drift:  12px; width: 3px; height: 3px; }
+  .embers span:nth-child(18) { left: 22%; animation-duration: 26s; animation-delay: 12.6s; --drift: -44px; }
+
+  /* Anyone who gets motion sick, or a device saving battery, sees it still. */
+  @media (prefers-reduced-motion: reduce) {
+    .embers { display: none; }
+    .forge-bg::after { animation: none; opacity: 0.55; }
+  }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -53,10 +131,19 @@
     font-size: 2.2rem;
     margin: 0;
     letter-spacing: 1px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-core));
+    background: linear-gradient(100deg,
+      var(--accent) 0%, var(--accent-core) 25%, #fff3c4 40%,
+      var(--accent-core) 55%, var(--accent) 80%, var(--accent) 100%);
+    background-size: 280% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    animation: shimmer 6s ease-in-out infinite;
+    filter: drop-shadow(0 0 14px rgba(253, 116, 0, 0.35));
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 100% 50%; }
+    50%      { background-position: 0% 50%; }
   }
   header p {
     color: var(--muted);
@@ -75,14 +162,19 @@
     margin: 0 auto;
   }
   .day-header {
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     gap: 18px;
-    background: var(--card);
+    background:
+      linear-gradient(135deg, rgba(253, 116, 0, 0.10) 0%, transparent 45%),
+      var(--card);
     border: 1px solid var(--card-border);
     border-radius: 18px;
     padding: 18px 22px;
     margin-bottom: 22px;
+    box-shadow: 0 4px 22px rgba(0, 0, 0, 0.4);
   }
   .day-info { flex: 1; min-width: 0; }
   .day-date {
@@ -102,7 +194,10 @@
     flex-shrink: 0;
   }
   .day-ring { width: 56px; height: 56px; }
-  #dayRingFill { transition: stroke-dashoffset 0.35s ease; }
+  #dayRingFill {
+    transition: stroke-dashoffset 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
+    filter: drop-shadow(0 0 5px rgba(61, 220, 132, 0.75));
+  }
   .day-ring-pct {
     position: absolute;
     inset: 0;
@@ -171,10 +266,28 @@
     gap: 16px;
     transition: border-color 0.2s, opacity 0.2s;
   }
+  .habit-card {
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  }
+  .habit-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(100deg, var(--tile, var(--accent)) 0%, transparent 42%);
+    opacity: 0.07;
+  }
+  .habit-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45),
+                0 0 0 1px color-mix(in srgb, var(--tile, var(--accent)) 35%, transparent);
+  }
   .habit-card.done {
     border-color: var(--good);
     border-left-color: var(--good);
   }
+  .habit-card.done::after { opacity: 0.03; }
   .remove-btn {
     position: absolute;
     top: -9px;
@@ -241,6 +354,12 @@
     border-color: var(--good);
     color: var(--on-accent);
     box-shadow: 0 0 14px rgba(61, 220, 132, 0.45);
+    animation: pop 0.3s ease;
+  }
+  @keyframes pop {
+    0%   { transform: scale(0.75); }
+    55%  { transform: scale(1.14); }
+    100% { transform: scale(1); }
   }
   .check-btn:active {
     transform: scale(0.9);
@@ -428,10 +547,14 @@
   }
   .tab-icon { margin-right: 5px; }
 
+  .tab-btn {
+    transition: color 0.18s, background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  }
   .tab-btn.active {
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent-hot), var(--accent));
     border-color: var(--accent);
     color: var(--on-accent);
+    box-shadow: 0 0 16px rgba(253, 116, 0, 0.45);
   }
   .tab-panel {
     display: none;
@@ -457,9 +580,12 @@
     flex-direction: column;
   }
   .practice-card {
-    background: var(--card);
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(253, 116, 0, 0.09) 0%, transparent 70%),
+      var(--card);
     border: 1px solid var(--card-border);
     border-radius: 16px;
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.45);
     padding: 28px;
     text-align: center;
     max-width: 1100px;
@@ -493,7 +619,9 @@
     font-size: 1.15rem;
   }
   .staff-wrap {
-    background: #f2efe8;
+    background: linear-gradient(175deg, #fbf8f1 0%, #ece7db 100%);
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.18),
+                0 0 24px rgba(253, 116, 0, 0.14);
     border-radius: 12px;
     padding: 20px 0;
     margin-bottom: 26px;
@@ -524,8 +652,26 @@
     font-weight: 700;
     cursor: pointer;
   }
+  .note-btn {
+    transition: transform 0.12s, box-shadow 0.18s, border-color 0.18s;
+  }
+  .note-btn:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 14px rgba(253, 116, 0, 0.28);
+  }
   .note-btn:active {
     transform: scale(0.95);
+  }
+  .note-btn.correct {
+    box-shadow: 0 0 20px rgba(61, 220, 132, 0.55);
+  }
+  .note-btn.wrong {
+    animation: shake 0.3s ease;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-5px); }
+    75%      { transform: translateX(5px); }
   }
   .note-btn:focus-visible {
     outline: 3px solid var(--accent);
@@ -570,9 +716,11 @@
   }
   .ear-emoji.ringing {
     transform: scale(1.18);
+    filter: drop-shadow(0 0 20px rgba(253, 116, 0, 0.75));
   }
   .replay-btn {
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent-hot), var(--accent));
+    box-shadow: 0 4px 18px rgba(253, 116, 0, 0.4);
     color: var(--on-accent);
     border: none;
     border-radius: 12px;
@@ -713,6 +861,16 @@
 </style>
 </head>
 <body>
+<!-- Atmosphere layers: a forge glow behind everything, plus embers drifting
+     up. Pointer-events none so they never block a tap. -->
+<div class="forge-bg" aria-hidden="true"></div>
+<div class="embers" aria-hidden="true">
+  <span></span><span></span><span></span><span></span><span></span>
+  <span></span><span></span><span></span><span></span><span></span>
+  <span></span><span></span><span></span><span></span><span></span>
+  <span></span><span></span><span></span>
+</div>
+
 <div class="wrap">
   <header>
     <h1>🔥 Forge</h1>
