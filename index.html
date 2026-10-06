@@ -459,6 +459,99 @@
     color: var(--text);
     font-size: 0.95rem;
   }
+  /* ---- Piano pieces ---- */
+  #tab-pieces.active {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .pieces-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .piece-card {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-left: 6px solid var(--tile, var(--accent));
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  }
+  .piece-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .piece-main { flex: 1; min-width: 0; }
+  .piece-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .piece-composer {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 1px;
+  }
+  .piece-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .piece-status {
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-weight: 700;
+    font-size: 0.72rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .piece-status.learning  { background: rgba(255,152,9,0.16);  color: var(--accent-hot); border-color: rgba(255,152,9,0.4); }
+  .piece-status.polishing { background: rgba(253,224,57,0.14); color: var(--accent-core); border-color: rgba(253,224,57,0.35); }
+  .piece-status.memorized { background: rgba(61,220,132,0.14); color: var(--good); border-color: rgba(61,220,132,0.4); }
+  .piece-stale { color: var(--bad-soft); }
+  .piece-notes {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--card-border);
+    font-size: 0.85rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .piece-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .piece-btn {
+    border: 1px solid var(--card-border);
+    background: var(--card-raise);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .piece-btn.done {
+    background: var(--good);
+    border-color: var(--good);
+    color: var(--on-accent);
+  }
+  .piece-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .piece-btn.done:hover { color: var(--on-accent); }
+
   .sync-dialog { max-width: 420px; }
   .sync-box {
     width: 100%;
@@ -1017,6 +1110,9 @@
     <button class="tab-btn" data-tab="ear">
       <span class="tab-icon">👂</span><span class="tab-label">Ear Training</span>
     </button>
+    <button class="tab-btn" data-tab="pieces">
+      <span class="tab-icon">🎼</span><span class="tab-label">Pieces</span>
+    </button>
   </nav>
 
   <div id="tab-habits" class="tab-panel active">
@@ -1076,6 +1172,17 @@
       <div class="practice-feedback" id="srFeedback">What note is this?</div>
       <div class="answer-grid" id="srAnswers"></div>
     </div>
+  </div>
+
+  <div id="tab-pieces" class="tab-panel">
+    <div class="pieces-head">
+      <div>
+        <h3 class="col-title backdrop-label" style="margin:0">Piano pieces</h3>
+      </div>
+      <button class="edit-toggle" id="pieceEditToggle">Edit</button>
+    </div>
+    <div id="pieceList"></div>
+    <button class="add-tile" id="addPieceBtn">+ Add a piece</button>
   </div>
 
   <div id="tab-ear" class="tab-panel">
@@ -1145,6 +1252,27 @@
   </div>
 </dialog>
 
+<dialog id="pieceDialog">
+  <h3 style="margin-top:0" id="pieceDialogTitle">New piece</h3>
+  <label for="pTitle">Title</label>
+  <input id="pTitle" placeholder="e.g. Clair de Lune" maxlength="60">
+  <label for="pComposer">Composer (optional)</label>
+  <input id="pComposer" placeholder="e.g. Debussy" maxlength="40">
+  <label for="pStatus">How's it going?</label>
+  <select id="pStatus">
+    <option value="learning">Learning it</option>
+    <option value="polishing">Polishing</option>
+    <option value="memorized">Memorized</option>
+  </select>
+  <label for="pNotes">Tricky spots / notes</label>
+  <textarea id="pNotes" class="sync-box" rows="3"
+    placeholder="e.g. left hand bars 12-16, pedal in the bridge"></textarea>
+  <div class="dialog-actions">
+    <button class="btn-cancel" id="cancelPieceDialog">Cancel</button>
+    <button class="btn-save" id="savePieceDialog">Save</button>
+  </div>
+</dialog>
+
 <dialog id="syncDialog" class="sync-dialog">
   <h3 style="margin-top:0">Move data between devices</h3>
   <p class="dialog-hint" style="min-height:0">
@@ -1202,7 +1330,8 @@
     "forge_tasks_v1",
     "forge_removed_defaults_v1",
     "forge_sightread_v1",
-    "forge_eartraining_v1"
+    "forge_eartraining_v1",
+    "forge_pieces_v1"
   ];
 
   function dump() {
@@ -1295,6 +1424,7 @@ const TASKS_KEY = "forge_tasks_v1";
 // users. That must not resurrect ones Kaius deliberately deleted, so we
 // remember which defaults he removed.
 const REMOVED_DEFAULTS_KEY = "forge_removed_defaults_v1";
+const PIECES_KEY = "forge_pieces_v1";
 
 const DEFAULT_HABITS = [
   { id: "bible", name: "Bible Reading", icon: "📖", log: {} },
@@ -1425,6 +1555,69 @@ function loadTasks() {
 
 function saveTasks(tasks) {
   localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+}
+
+/* ---------- Piano pieces ----------
+  The stopwatch records how long you practised but nothing about what, so
+  this tracks the actual pieces: where each one is up to, what's tricky,
+  and when you last touched it. The "last played" figure is the useful
+  part -- it surfaces the piece you've been quietly avoiding.
+----------------------------------- */
+
+const PIECE_STATUSES = ["learning", "polishing", "memorized"];
+const PIECE_STATUS_LABEL = {
+  learning: "Learning",
+  polishing: "Polishing",
+  memorized: "Memorized",
+};
+
+// Repair rather than trust, same as habits. A missing log here would
+// otherwise crash the render and wedge the whole app.
+function migratePiece(piece) {
+  if (!piece || typeof piece !== "object") return null;
+  if (typeof piece.id !== "string" || !piece.id) return null;
+  if (typeof piece.title !== "string" || !piece.title) piece.title = "Untitled piece";
+  if (typeof piece.composer !== "string") piece.composer = "";
+  if (typeof piece.notes !== "string") piece.notes = "";
+  if (!PIECE_STATUSES.includes(piece.status)) piece.status = "learning";
+  if (!piece.log || typeof piece.log !== "object" || Array.isArray(piece.log)) piece.log = {};
+  if (typeof piece.added !== "string") piece.added = todayStr();
+  return piece;
+}
+
+function loadPieces() {
+  const raw = localStorage.getItem(PIECES_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(migratePiece).filter(Boolean);
+  } catch (e) {}
+  return [];
+}
+
+function savePieces() {
+  localStorage.setItem(PIECES_KEY, JSON.stringify(pieces));
+}
+
+function pieceLastPlayed(piece) {
+  const days = Object.keys(piece.log).filter(d => piece.log[d]).sort();
+  return days.length ? days[days.length - 1] : null;
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + "T00:00:00");
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.round((now - then) / 86400000);
+}
+
+function lastPlayedLabel(piece) {
+  const d = daysSince(pieceLastPlayed(piece));
+  if (d === null) return "Never played";
+  if (d === 0) return "Played today";
+  if (d === 1) return "Played yesterday";
+  return `${d} days since played`;
 }
 
 /* ---------- Scheduling ----------
@@ -1699,6 +1892,9 @@ function renderWeeklyReports() {
 
 let habits = loadHabits();
 let tasks = loadTasks();
+let pieces = loadPieces();
+let pieceEditMode = false;
+let editingPieceId = null;
 
 function periodKeyForTask(task) {
   if (task.repeat === "weekly") return dateKey(startOfWeek(new Date()));
@@ -1792,6 +1988,101 @@ function toggleTask(id) {
   else task.done[key] = true;
   saveTasks(tasks);
   renderTasks();
+}
+
+/* ---------- Piano pieces: rendering ---------- */
+
+// Pieces you've neglected float to the top; memorized ones sink, since
+// those are the least urgent. Within a group, longest-unplayed first.
+function sortedPieces() {
+  const rank = { learning: 0, polishing: 1, memorized: 2 };
+  return pieces.slice().sort((a, b) => {
+    const ra = rank[a.status], rb = rank[b.status];
+    if (ra !== rb) return ra - rb;
+    const da = daysSince(pieceLastPlayed(a));
+    const db = daysSince(pieceLastPlayed(b));
+    if (da === null && db === null) return a.title.localeCompare(b.title);
+    if (da === null) return -1;          // never played is most urgent
+    if (db === null) return 1;
+    return db - da;
+  });
+}
+
+function renderPieces() {
+  const list = document.getElementById("pieceList");
+  if (!list) return;
+
+  if (!pieces.length) {
+    list.innerHTML = `<div class="empty-state">No pieces yet. Add what you're working on.</div>`;
+    return;
+  }
+
+  const today = todayStr();
+  list.innerHTML = sortedPieces().map((piece, i) => {
+    const playedToday = !!piece.log[today];
+    const since = daysSince(pieceLastPlayed(piece));
+    const stale = since === null || since >= 7;
+    return `
+      <div class="piece-card" style="--tile:${tileColor(i)}">
+        ${pieceEditMode ? `<button class="remove-btn" data-remove-piece="${piece.id}" title="Remove">✕</button>` : ""}
+        <div class="piece-top">
+          <div class="piece-main">
+            <h2 class="piece-title">${escapeHtml(piece.title)}</h2>
+            ${piece.composer ? `<div class="piece-composer">${escapeHtml(piece.composer)}</div>` : ""}
+            <div class="piece-meta">
+              <button class="piece-status ${piece.status}" data-cycle-piece="${piece.id}"
+                      title="Tap to change">${PIECE_STATUS_LABEL[piece.status]}</button>
+              <span class="${stale ? "piece-stale" : ""}">${lastPlayedLabel(piece)}</span>
+            </div>
+          </div>
+          <div class="piece-actions">
+            <button class="piece-btn ${playedToday ? "done" : ""}" data-play-piece="${piece.id}">
+              ${playedToday ? "✓ Played" : "Played it"}
+            </button>
+            <button class="piece-btn" data-edit-piece="${piece.id}">Edit</button>
+          </div>
+        </div>
+        ${piece.notes ? `<div class="piece-notes">${escapeHtml(piece.notes)}</div>` : ""}
+      </div>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-play-piece]").forEach(b =>
+    b.addEventListener("click", () => togglePiecePlayed(b.dataset.playPiece)));
+  list.querySelectorAll("[data-cycle-piece]").forEach(b =>
+    b.addEventListener("click", () => cyclePieceStatus(b.dataset.cyclePiece)));
+  list.querySelectorAll("[data-edit-piece]").forEach(b =>
+    b.addEventListener("click", () => openPieceDialog(b.dataset.editPiece)));
+  list.querySelectorAll("[data-remove-piece]").forEach(b =>
+    b.addEventListener("click", () => removePiece(b.dataset.removePiece)));
+}
+
+function togglePiecePlayed(id) {
+  const piece = pieces.find(p => p.id === id);
+  if (!piece) return;
+  const today = todayStr();
+  if (piece.log[today]) delete piece.log[today];
+  else piece.log[today] = true;
+  savePieces();
+  renderPieces();
+}
+
+function cyclePieceStatus(id) {
+  const piece = pieces.find(p => p.id === id);
+  if (!piece) return;
+  const next = (PIECE_STATUSES.indexOf(piece.status) + 1) % PIECE_STATUSES.length;
+  piece.status = PIECE_STATUSES[next];
+  savePieces();
+  renderPieces();
+}
+
+function removePiece(id) {
+  const piece = pieces.find(p => p.id === id);
+  if (!piece) return;
+  if (!confirm(`Remove "${piece.title}"?`)) return;
+  pieces = pieces.filter(p => p.id !== id);
+  savePieces();
+  renderPieces();
 }
 
 function removeHabit(id) {
@@ -2061,6 +2352,7 @@ document.querySelectorAll(".tabs .tab-btn").forEach(btn => {
       etUpdateTimer();
       etNextCard();
     }
+    if (btn.dataset.tab === "pieces") renderPieces();
   });
 });
 
@@ -2634,7 +2926,7 @@ document.addEventListener("keydown", (e) => {
     best times         -> the faster one
 ----------------------------------------------- */
 
-const SYNC_KEYS = [STORAGE_KEY, TASKS_KEY, REMOVED_DEFAULTS_KEY, SR_KEY, ET_KEY];
+const SYNC_KEYS = [STORAGE_KEY, TASKS_KEY, REMOVED_DEFAULTS_KEY, SR_KEY, ET_KEY, PIECES_KEY];
 
 function exportData() {
   const payload = { v: 1, at: new Date().toISOString(), data: {} };
@@ -2688,6 +2980,25 @@ function mergeHabits(mine, theirs) {
     }
     if (!existing.schedule && t.schedule) existing.schedule = t.schedule;
     if (!existing.trackTime && t.trackTime) existing.trackTime = true;
+  });
+  return out;
+}
+
+function mergePieces(mine, theirs) {
+  const out = mine.map(p => Object.assign({}, p));
+  const byId = new Map(out.map(p => [p.id, p]));
+  theirs.forEach(t => {
+    const existing = byId.get(t.id);
+    if (!existing) { out.push(t); return; }
+    existing.log = mergeLogs(existing.log, t.log);
+    // furthest-along status wins; you don't un-memorize a piece by syncing
+    const rank = { learning: 0, polishing: 1, memorized: 2 };
+    if ((rank[t.status] || 0) > (rank[existing.status] || 0)) existing.status = t.status;
+    // keep both sets of notes rather than silently dropping one
+    if (t.notes && t.notes !== existing.notes) {
+      existing.notes = existing.notes ? existing.notes + "\n" + t.notes : t.notes;
+    }
+    if (!existing.composer && t.composer) existing.composer = t.composer;
   });
   return out;
 }
@@ -2763,8 +3074,16 @@ function importData(code) {
     taskCount = clean.length;
   }
 
+  const theirPieces = read(PIECES_KEY, null);
+  let nextPieces = null;
+  if (Array.isArray(theirPieces)) {
+    const clean = theirPieces.map(migratePiece).filter(Boolean);
+    nextPieces = mergePieces(pieces, clean).map(migratePiece).filter(Boolean);
+  }
+
   if (nextHabits) { habits = nextHabits; saveHabits(habits); }
   if (nextTasks) { tasks = nextTasks; saveTasks(tasks); }
+  if (nextPieces) { pieces = nextPieces; savePieces(); }
 
   const theirRemoved = read(REMOVED_DEFAULTS_KEY, null);
   if (Array.isArray(theirRemoved)) {
@@ -2779,6 +3098,7 @@ function importData(code) {
   if (theirET) { etState = mergePractice(etState, normalizeET(theirET)); saveET(); }
 
   render();
+  renderPieces();
   return { ok: true, msg: `Merged in ${habitCount} habits and ${taskCount} chores. Nothing was lost.` };
 }
 
@@ -2827,6 +3147,54 @@ function showRecovery(err) {
     document.getElementById("recCopy").textContent = "Copied";
   });
 }
+
+/* ---------- Piano pieces: dialog + buttons ---------- */
+
+const pieceDialog = document.getElementById("pieceDialog");
+
+function openPieceDialog(id) {
+  editingPieceId = id || null;
+  const piece = id ? pieces.find(p => p.id === id) : null;
+  document.getElementById("pieceDialogTitle").textContent = piece ? "Edit piece" : "New piece";
+  document.getElementById("pTitle").value = piece ? piece.title : "";
+  document.getElementById("pComposer").value = piece ? piece.composer : "";
+  document.getElementById("pStatus").value = piece ? piece.status : "learning";
+  document.getElementById("pNotes").value = piece ? piece.notes : "";
+  pieceDialog.showModal();
+}
+
+document.getElementById("addPieceBtn").addEventListener("click", () => openPieceDialog(null));
+document.getElementById("cancelPieceDialog").addEventListener("click", () => pieceDialog.close());
+
+document.getElementById("savePieceDialog").addEventListener("click", () => {
+  const title = document.getElementById("pTitle").value.trim();
+  if (!title) return;
+  const composer = document.getElementById("pComposer").value.trim();
+  const status = document.getElementById("pStatus").value;
+  const notes = document.getElementById("pNotes").value.trim();
+
+  if (editingPieceId) {
+    const piece = pieces.find(p => p.id === editingPieceId);
+    if (piece) Object.assign(piece, { title, composer, status, notes });
+  } else {
+    pieces.push(migratePiece({
+      id: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) + "-" + Date.now().toString(36),
+      title, composer, status, notes, log: {}, added: todayStr(),
+    }));
+  }
+  editingPieceId = null;
+  savePieces();
+  pieceDialog.close();
+  renderPieces();
+});
+
+document.getElementById("pieceEditToggle").addEventListener("click", () => {
+  pieceEditMode = !pieceEditMode;
+  const btn = document.getElementById("pieceEditToggle");
+  btn.classList.toggle("active", pieceEditMode);
+  btn.textContent = pieceEditMode ? "Done" : "Edit";
+  renderPieces();
+});
 
 const syncDialog = document.getElementById("syncDialog");
 document.getElementById("syncToggle").addEventListener("click", () => {
@@ -2884,6 +3252,7 @@ if ("serviceWorker" in navigator) {
 try {
   archiveCompletedWeeks();
   render();
+  renderPieces();
 } catch (err) {
   showRecovery(err);
 }
