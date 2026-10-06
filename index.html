@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Forge</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="icon" type="image/png" sizes="64x64" href="icon-64.png">
@@ -34,6 +34,15 @@
     --bad-soft: #ff9a86;
   }
   * { box-sizing: border-box; }
+
+  /* The html element had no background, so the browser's default white
+     showed through at the top of the screen -- in the safe area above the
+     page on a phone, and whenever the page rubber-bands past its edge.
+     body alone isn't enough: it only paints its own box. */
+  html {
+    background: var(--bg-deep);
+    color-scheme: dark;   /* keeps scrollbars and overscroll dark too */
+  }
 
   /* ---- Atmosphere: forge glow + drifting embers ---- */
   /* Real forge photo behind everything. Measured brightness per band:
@@ -138,9 +147,15 @@
       radial-gradient(ellipse 70% 40% at 50% 0%, var(--ember) 0%, transparent 70%),
       radial-gradient(circle at top, #0a1428 0%, var(--bg) 55%, var(--bg-deep) 100%);
     background-attachment: fixed;
+    background-color: var(--bg-deep);
     color: var(--text);
     min-height: 100vh;
-    padding: 24px 16px 60px;
+    min-height: 100dvh;   /* dvh accounts for the phone's address bar */
+    /* clear the notch / status bar rather than sliding under it */
+    padding: calc(24px + env(safe-area-inset-top, 0px))
+             calc(16px + env(safe-area-inset-right, 0px))
+             60px
+             calc(16px + env(safe-area-inset-left, 0px));
   }
   header {
     text-align: center;
