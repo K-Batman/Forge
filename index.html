@@ -466,19 +466,17 @@
     border-radius: 16px;
   }
 
-  .stopwatch-row {
-    display: flex;
+  /* Inline, no divider row, so a timed habit card is exactly as tall as a
+     plain one. */
+  .stopwatch-inline {
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--card-border);
-    flex-wrap: wrap;
+    gap: 9px;
   }
   .stopwatch-time {
     font-variant-numeric: tabular-nums;
-    font-size: 1.3rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     color: var(--text);
   }
   .stopwatch-time.running {
@@ -486,10 +484,10 @@
   }
   .sw-btn {
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    border-radius: 7px;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
     cursor: pointer;
   }
   .sw-btn.start {
@@ -501,14 +499,7 @@
     color: var(--bad-soft);
     border: 1px solid var(--bad-soft);
   }
-  .sw-week-total {
-    margin-left: auto;
-    font-size: 0.82rem;
-    color: var(--muted);
-  }
-  .sw-week-total b {
-    color: var(--text);
-  }
+
   .weekly-reports {
     margin-top: 24px;
   }
@@ -1253,12 +1244,6 @@ function liveTodaySeconds(habit) {
   return base + currentSessionSeconds(habit);
 }
 
-function liveWeekSeconds(habit) {
-  const monday = startOfWeek(new Date());
-  const base = sumSecondsForWeek(habit.practice.seconds, monday);
-  return base + currentSessionSeconds(habit);
-}
-
 function toggleStopwatch(id) {
   const habit = habits.find(h => h.id === id);
   if (!habit || !habit.trackTime) return;
@@ -1303,16 +1288,16 @@ function archiveCompletedWeeks() {
   if (changed) saveHabits(habits);
 }
 
+// Sits inline in the stats row so a timed habit is the same height as a
+// plain one. The week's total lives only in the Week of... reports below.
 function renderStopwatchRow(habit) {
   const running = !!habit.practice.sessionStart;
   const todaySec = liveTodaySeconds(habit);
-  const weekSec = liveWeekSeconds(habit);
   return `
-    <div class="stopwatch-row">
+    <span class="stopwatch-inline">
       <span class="stopwatch-time ${running ? "running" : ""}" id="sw-time-${habit.id}">${formatHMS(todaySec)}</span>
       <button class="sw-btn ${running ? "stop" : "start"}" data-sw-id="${habit.id}">${running ? "Stop" : "Start"}</button>
-      <span class="sw-week-total" id="sw-week-${habit.id}">This week: <b>${formatDuration(weekSec)}</b></span>
-    </div>
+    </span>
   `;
 }
 
@@ -1504,11 +1489,11 @@ function render() {
       <div class="habit-info">
         <h2>${escapeHtml(habit.name)}</h2>
         <div class="habit-stats">
-          <span class="streak-flame">🔥 <b>${streak}</b> day streak</span>
+          ${habit.trackTime ? "" : `<span class="streak-flame">🔥 <b>${streak}</b> day streak</span>`}
           <span>Best: <b>${best}</b></span>
           <span>Total: <b>${total}</b></span>
+          ${habit.trackTime ? renderStopwatchRow(habit) : ""}
         </div>
-        ${habit.trackTime ? renderStopwatchRow(habit) : ""}
       </div>
       <button class="check-btn ${doneToday ? "checked" : ""}" data-id="${habit.id}">
         ${doneToday ? "✓" : ""}
@@ -2194,9 +2179,7 @@ setInterval(() => {
     habits.forEach(habit => {
       if (!habit.trackTime || !habit.practice || !habit.practice.sessionStart) return;
       const timeEl = document.getElementById(`sw-time-${habit.id}`);
-      const weekEl = document.getElementById(`sw-week-${habit.id}`);
       if (timeEl) timeEl.textContent = formatHMS(liveTodaySeconds(habit));
-      if (weekEl) weekEl.innerHTML = `This week: <b>${formatDuration(liveWeekSeconds(habit))}</b>`;
     });
   }
   const before = habits.map(h => (h.practice ? h.practice.history.length : 0));
